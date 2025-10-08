@@ -11,9 +11,6 @@ sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
 alembic==1.13.1
 
-# Cache (Redis)
-redis==5.0.1
-
 # Seguridad
 pydantic==2.5.3
 pydantic-settings==2.1.0
