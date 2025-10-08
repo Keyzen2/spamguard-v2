@@ -1,58 +1,49 @@
-"""
-SpamGuard API v3.0 Hybrid - Configuration
-Sin billing, todo gratis por ahora
-"""
 from pydantic_settings import BaseSettings
-from functools import lru_cache
+from typing import List, Optional
+import json
 
 class Settings(BaseSettings):
-    
-    # API Info
-    API_V1_STR: str = "/api/v1"
-    PROJECT_NAME: str = "SpamGuard API v3.0 Hybrid"
+    # Project
+    PROJECT_NAME: str = "SpamGuard API"
     VERSION: str = "3.0.0"
-    DESCRIPTION: str = "ML-powered spam detection API (Free tier)"
+    ENVIRONMENT: str = "production"
     
-    # Environment
-    ENVIRONMENT: str = "development"
-    DEBUG: bool = False
+    # API Keys
+    API_KEY_PREFIX: str = "sg"
+    
+    # Supabase
+    SUPABASE_URL: str
+    SUPABASE_SERVICE_KEY: str
+    
+    # Database
+    DATABASE_URL: str
     
     # Security
     SECRET_KEY: str
-    API_KEY_PREFIX: str = "sg"
     
-    # Database (Supabase)
-    SUPABASE_URL: str
-    SUPABASE_SERVICE_KEY: str
-    DATABASE_URL: str
+    # CORS
+    CORS_ORIGINS: List[str] = ["*"]
     
-    # Redis Cache (opcional por ahora)
-    REDIS_URL: str | None = None
-    CACHE_TTL: int = 300  # 5 minutos
+    # Redis (OPCIONAL)
+    REDIS_URL: Optional[str] = None
     
     # ML Model
     MODEL_PATH: str = "ml/models/spam_model_v1"
-    MODEL_DEVICE: str = "cpu"
     
-    # Rate Limiting (soft - no bloquea, solo avisa)
-    RATE_LIMIT_ENABLED: bool = True
-    MONTHLY_REQUEST_LIMIT: int = 1000  # Por usuario
-    
-    # CORS
-    CORS_ORIGINS: list = [
-        "http://localhost:3000",
-        "http://localhost:8000",
-        "*"  # Permitir todos por ahora (FREE)
-    ]
-    
-    # Logging
-    LOG_LEVEL: str = "INFO"
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Parse CORS origins from string or list"""
+        if isinstance(self.CORS_ORIGINS, str):
+            try:
+                return json.loads(self.CORS_ORIGINS)
+            except:
+                return [origin.strip() for origin in self.CORS_ORIGINS.split(',') if origin.strip()]
+        return self.CORS_ORIGINS
     
     class Config:
         env_file = ".env"
         case_sensitive = True
 
-@lru_cache()
 def get_settings() -> Settings:
     return Settings()
 
