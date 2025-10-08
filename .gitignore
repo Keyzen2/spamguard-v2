@@ -43,10 +43,11 @@ Thumbs.db
 *.log
 logs/
 
-# ML Models
+# ML Models (excepto .gitkeep)
 ml/models/*.pkl
 ml/models/*.joblib
 ml/data/
+!ml/models/.gitkeep
 
 # Testing
 .pytest_cache/
