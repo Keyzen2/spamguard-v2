@@ -1,39 +1,79 @@
+"""
+Configuration settings for SpamGuard API
+"""
 from pydantic_settings import BaseSettings
-from functools import lru_cache
 from typing import Optional
+from functools import lru_cache
 
 class Settings(BaseSettings):
-    # Supabase
-    supabase_url: str
-    supabase_key: str
-    supabase_service_key: str
     
-    # API
-    api_version: str = "v1"
-    environment: str = "production"
-    debug: bool = False
+    # API Info
+    API_V1_STR: str = "/api/v1"
+    PROJECT_NAME: str = "SpamGuard API"
+    VERSION: str = "1.0.0"
+    DESCRIPTION: str = "Spam, Phishing & AI-Generated Content Detection API"
     
-    # ML
-    ml_model_path: str = "models/"
-    retrain_threshold: int = 100
-    min_samples_for_retrain: int = 50
+    # Environment
+    ENVIRONMENT: str = "development"  # development, staging, production
+    DEBUG: bool = False
     
-    # Redis
-    redis_url: Optional[str] = None
+    # Security
+    SECRET_KEY: str
+    API_KEY_PREFIX: str = "sg"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     
-    # Admin (para endpoints sensibles)
-    admin_secret: str = "tu_clave_super_secreta_aqui_123456"
+    # Database
+    SUPABASE_URL: str
+    SUPABASE_SERVICE_KEY: str
+    DATABASE_URL: str
     
-    # Admin API Key (NUEVA - para reentrenamiento)
-    admin_api_key: str = ""  # Se configura en Railway como variable de entorno
+    # Redis Cache
+    REDIS_URL: Optional[str] = None
+    CACHE_TTL: int = 300  # 5 minutes
     
-    model_config = {
-        "env_file": ".env",
-        "env_file_encoding": 'utf-8',
-        "case_sensitive": False,
-        "protected_namespaces": ('settings_',)
+    # ML Model
+    MODEL_PATH: str = "ml/models/distilbert_spam_v1"
+    MODEL_DEVICE: str = "cpu"  # cpu or cuda
+    
+    # Rate Limiting
+    RATE_LIMIT_ENABLED: bool = True
+    
+    # Plans & Limits
+    PLAN_LIMITS: dict = {
+        "free": 500,
+        "pro": 10000,
+        "business": 100000,
+        "enterprise": 999999999
     }
+    
+    # Stripe (Billing)
+    STRIPE_SECRET_KEY: Optional[str] = None
+    STRIPE_WEBHOOK_SECRET: Optional[str] = None
+    STRIPE_PRICES: dict = {
+        "pro": "price_xxx",  # Configurar en Stripe
+        "business": "price_yyy"
+    }
+    
+    # CORS
+    CORS_ORIGINS: list = [
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "https://spamguard.ai",
+        "https://app.spamguard.ai"
+    ]
+    
+    # Logging
+    LOG_LEVEL: str = "INFO"
+    
+    # Monitoring
+    SENTRY_DSN: Optional[str] = None
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
 
 @lru_cache()
-def get_settings():
+def get_settings() -> Settings:
     return Settings()
+
+settings = get_settings()
