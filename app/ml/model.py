@@ -1,5 +1,5 @@
 """
-ML Model Predictor (mejorado para v3.0)
+ML Model Predictor v3.0 - Con Railway Volume support
 """
 import joblib
 import numpy as np
@@ -9,11 +9,12 @@ from app.ml.preprocessing import preprocess_text
 import logging
 from pathlib import Path
 from app.config import settings
+import os
 
 logger = logging.getLogger(__name__)
 
 class MLPredictor:
-    """Predictor ML mejorado"""
+    """Predictor ML con Railway Volume support"""
     
     _instance = None
     _initialized = False
@@ -32,29 +33,46 @@ class MLPredictor:
         return instance
     
     def _initialize(self):
-        """Cargar modelo"""
+        """Cargar modelo desde Railway Volume o local"""
         logger.info("🤖 Loading ML Model...")
         
         try:
-            model_path = Path(settings.MODEL_PATH)
+            # Detectar Railway Volume
+            volume_path = os.getenv('RAILWAY_VOLUME_MOUNT_PATH')
             
-            # Cargar modelo (puede ser logistic regression por ahora)
-            if model_path.exists():
-                self.model = joblib.load(model_path / 'model.pkl')
-                self.vectorizer = joblib.load(model_path / 'vectorizer.pkl')
-                logger.info("   ✅ Model loaded from disk")
+            if volume_path:
+                # Usar modelo desde volumen persistente
+                model_dir = Path(volume_path) / 'models'
+                logger.info(f"   Using Railway Volume: {volume_path}")
             else:
-                # Modelo por defecto (crear si no existe)
+                # Usar modelo local (desarrollo)
+                model_dir = Path(settings.MODEL_PATH)
+                logger.info(f"   Using local path: {model_dir}")
+            
+            model_path = model_dir / 'spam_model.pkl'
+            metadata_path = model_dir / 'model_metadata.json'
+            
+            # Cargar modelo
+            if model_path.exists():
+                self.model = joblib.load(model_path)
+                logger.info("   ✅ Model loaded from volume/disk")
+                
+                # Cargar metadata si existe
+                if metadata_path.exists():
+                    import json
+                    with open(metadata_path, 'r') as f:
+                        metadata = json.load(f)
+                    logger.info(f"   📊 Model version: {metadata.get('model_version', 'unknown')}")
+                    logger.info(f"   📈 Accuracy: {metadata.get('metrics', {}).get('test_accuracy', 0):.2%}")
+            else:
                 logger.warning("   ⚠️ Model not found, using rule-based fallback")
                 self.model = None
-                self.vectorizer = None
             
             self.categories = ['ham', 'spam', 'phishing']
             
         except Exception as e:
             logger.error(f"   ❌ Error loading model: {str(e)}")
             self.model = None
-            self.vectorizer = None
     
     async def predict(
         self,
@@ -63,24 +81,15 @@ class MLPredictor:
     ) -> Dict:
         """
         Predecir categoría del texto
-        
-        Returns:
-            {
-                'category': 'spam',
-                'confidence': 0.95,
-                'scores': {'ham': 0.05, 'spam': 0.95, 'phishing': 0.0},
-                'risk_level': 'high',
-                'flags': ['excessive_caps', 'urgency_words']
-            }
         """
-        # 1. Preprocesar texto
+        # Preprocesar texto
         processed_text = preprocess_text(text)
         
-        # 2. Extraer features
+        # Extraer features
         features = extract_features(text, context)
         
-        # 3. Predecir con modelo (si existe)
-        if self.model and self.vectorizer:
+        # Predecir con modelo (si existe)
+        if self.model:
             prediction = self._predict_with_model(processed_text, features)
         else:
             # Fallback a reglas
@@ -91,11 +100,8 @@ class MLPredictor:
     def _predict_with_model(self, text: str, features: Dict) -> Dict:
         """Predicción con modelo ML"""
         try:
-            # Vectorizar texto
-            X = self.vectorizer.transform([text])
-            
             # Predecir
-            proba = self.model.predict_proba(X)[0]
+            proba = self.model.predict_proba([text])[0]
             pred_idx = np.argmax(proba)
             
             category = self.categories[pred_idx]
@@ -119,7 +125,7 @@ class MLPredictor:
         except Exception as e:
             logger.error(f"Model prediction error: {str(e)}")
             return self._predict_with_rules(features)
-    
+     
     def _predict_with_rules(self, features: Dict) -> Dict:
         """Predicción basada en reglas (fallback)"""
         spam_score = 0
