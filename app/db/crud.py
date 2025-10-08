@@ -26,7 +26,7 @@ async def log_api_request(
     status_code: int = 200,
     error_message: Optional[str] = None
 ):
-    """Log API request to database"""
+    """Log API request en base de datos"""
     try:
         supabase.table('api_requests').insert({
             'user_id': user_id,
@@ -47,30 +47,15 @@ async def log_api_request(
         logger.error(f"Error logging request: {str(e)}")
 
 async def save_feedback(feedback_data: Dict):
-    """Save user feedback"""
+    """Guardar feedback del usuario"""
     try:
         supabase.table('feedback_queue').insert(feedback_data).execute()
+        logger.info(f"Feedback saved: {feedback_data.get('id')}")
     except Exception as e:
         logger.error(f"Error saving feedback: {str(e)}")
 
-async def get_user_by_api_key(api_key_hash: str) -> Optional[Dict]:
-    """Get user by API key hash"""
-    try:
-        response = supabase.table('api_keys')\
-            .select('*, api_users(*)')\
-            .eq('key_hash', api_key_hash)\
-            .eq('is_active', True)\
-            .execute()
-        
-        if response.data:
-            return response.data[0]
-        return None
-    except Exception as e:
-        logger.error(f"Error getting user: {str(e)}")
-        return None
-
 async def get_monthly_usage(user_id: str, year: int, month: int) -> int:
-    """Get user's monthly usage"""
+    """Obtener uso mensual del usuario"""
     try:
         response = supabase.table('monthly_usage')\
             .select('requests_count')\
@@ -86,100 +71,38 @@ async def get_monthly_usage(user_id: str, year: int, month: int) -> int:
         logger.error(f"Error getting usage: {str(e)}")
         return 0
 
-async def create_user(email: str, password_hash: str, plan: str = 'free') -> Optional[Dict]:
-    """Create new user"""
+async def get_user_stats(user_id: str, period_days: int = 30) -> Dict:
+    """Obtener estadísticas del usuario"""
     try:
-        response = supabase.table('api_users').insert({
-            'email': email,
-            'password_hash': password_hash,
-            'plan': plan,
-            'is_active': True,
-            'email_verified': False,
-            'created_at': datetime.now().isoformat()
-        }).execute()
+        from datetime import timedelta
+        start_date = datetime.now() - timedelta(days=period_days)
         
-        if response.data:
-            return response.data[0]
-        return None
-    except Exception as e:
-        logger.error(f"Error creating user: {str(e)}")
-        return None
-
-async def update_user_plan(user_id: str, plan: str, stripe_subscription_id: Optional[str] = None):
-    """Update user's plan"""
-    try:
-        data = {'plan': plan}
-        if stripe_subscription_id:
-            data['stripe_subscription_id'] = stripe_subscription_id
-        
-        supabase.table('api_users')\
-            .update(data)\
-            .eq('id', user_id)\
-            .execute()
-    except Exception as e:
-        logger.error(f"Error updating plan: {str(e)}")
-
-async def get_webhooks_for_user(user_id: str, event_type: str) -> List[Dict]:
-    """Get active webhooks for user and event type"""
-    try:
-        response = supabase.table('webhooks')\
-            .select('*')\
+        response = supabase.table('api_requests')\
+            .select('prediction')\
             .eq('user_id', user_id)\
-            .eq('is_active', True)\
-            .contains('events', [event_type])\
+            .gte('created_at', start_date.isoformat())\
             .execute()
         
-        return response.data
+        requests = response.data
+        
+        total = len(requests)
+        spam_count = sum(1 for r in requests if r['prediction'].get('category') == 'spam')
+        ham_count = sum(1 for r in requests if r['prediction'].get('category') == 'ham')
+        phishing_count = sum(1 for r in requests if r['prediction'].get('category') == 'phishing')
+        
+        return {
+            'total_requests': total,
+            'spam_detected': spam_count,
+            'ham_detected': ham_count,
+            'phishing_detected': phishing_count,
+            'period_days': period_days
+        }
     except Exception as e:
-        logger.error(f"Error getting webhooks: {str(e)}")
-        return []
-
-async def trigger_webhooks(user_id: str, event_type: str, payload: Dict):
-    """Trigger webhooks for an event"""
-    webhooks = await get_webhooks_for_user(user_id, event_type)
-    
-    for webhook in webhooks:
-        try:
-            import httpx
-            import hmac
-            import hashlib
-            
-            # Sign payload
-            signature = hmac.new(
-                webhook['secret'].encode() if webhook.get('secret') else b'',
-                json.dumps(payload).encode(),
-                hashlib.sha256
-            ).hexdigest()
-            
-            # Send webhook
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    webhook['url'],
-                    json=payload,
-                    headers={
-                        'X-SpamGuard-Signature': signature,
-                        'X-SpamGuard-Event': event_type
-                    },
-                    timeout=10.0
-                )
-                
-                if response.status_code == 200:
-                    # Update success count
-                    supabase.table('webhooks')\
-                        .update({
-                            'last_triggered_at': datetime.now().isoformat(),
-                            'success_count': webhook['success_count'] + 1
-                        })\
-                        .eq('id', webhook['id'])\
-                        .execute()
-                else:
-                    # Update failure count
-                    supabase.table('webhooks')\
-                        .update({
-                            'failure_count': webhook['failure_count'] + 1
-                        })\
-                        .eq('id', webhook['id'])\
-                        .execute()
-                    
-        except Exception as e:
-            logger.error(f"Error triggering webhook {webhook['id']}: {str(e)}")
+        logger.error(f"Error getting stats: {str(e)}")
+        return {
+            'total_requests': 0,
+            'spam_detected': 0,
+            'ham_detected': 0,
+            'phishing_detected': 0,
+            'period_days': period_days
+        }
