@@ -1,20 +1,19 @@
 """
-ML Model: Spam Detection with DistilBERT
+ML Model Predictor (mejorado para v3.0)
 """
-import torch
-from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
-from typing import Dict, Optional, List
+import joblib
 import numpy as np
+from typing import Dict, Optional, List
 from app.ml.features import extract_features
 from app.ml.preprocessing import preprocess_text
-import asyncio
-from functools import lru_cache
 import logging
+from pathlib import Path
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-class MLModelPredictor:
-    """Singleton ML Model Predictor"""
+class MLPredictor:
+    """Predictor ML mejorado"""
     
     _instance = None
     _initialized = False
@@ -26,7 +25,6 @@ class MLModelPredictor:
     
     @classmethod
     def get_instance(cls):
-        """Get singleton instance"""
         instance = cls()
         if not cls._initialized:
             instance._initialize()
@@ -34,152 +32,165 @@ class MLModelPredictor:
         return instance
     
     def _initialize(self):
-        """Initialize model (called once)"""
-        logger.info("🤖 Initializing ML Model...")
-        
-        # Determine device
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        logger.info(f"   Device: {self.device}")
+        """Cargar modelo"""
+        logger.info("🤖 Loading ML Model...")
         
         try:
-            # Load tokenizer
-            self.tokenizer = DistilBertTokenizer.from_pretrained(
-                'distilbert-base-uncased'
-            )
+            model_path = Path(settings.MODEL_PATH)
             
-            # Load model
-            # TODO: Replace with your fine-tuned model path
-            # For now, using base model (you'll need to train this)
-            self.model = DistilBertForSequenceClassification.from_pretrained(
-                'distilbert-base-uncased',
-                num_labels=5  # ham, spam, phishing, ai_generated, fraud
-            )
+            # Cargar modelo (puede ser logistic regression por ahora)
+            if model_path.exists():
+                self.model = joblib.load(model_path / 'model.pkl')
+                self.vectorizer = joblib.load(model_path / 'vectorizer.pkl')
+                logger.info("   ✅ Model loaded from disk")
+            else:
+                # Modelo por defecto (crear si no existe)
+                logger.warning("   ⚠️ Model not found, using rule-based fallback")
+                self.model = None
+                self.vectorizer = None
             
-            self.model.to(self.device)
-            self.model.eval()
-            
-            # Labels
-            self.labels = ['ham', 'spam', 'phishing', 'ai_generated', 'fraud']
-            
-            logger.info("   ✅ Model loaded successfully")
+            self.categories = ['ham', 'spam', 'phishing']
             
         except Exception as e:
             logger.error(f"   ❌ Error loading model: {str(e)}")
-            raise
+            self.model = None
+            self.vectorizer = None
     
     async def predict(
         self,
         text: str,
-        context: Optional[Dict] = None,
-        language: Optional[str] = None,
-        return_explanation: bool = False
+        context: Optional[Dict] = None
     ) -> Dict:
         """
-        Predict spam category
-        
-        Args:
-            text: Text to analyze
-            context: Additional context (email, IP, etc.)
-            language: Language code (auto-detect if None)
-            return_explanation: Whether to return explanation
+        Predecir categoría del texto
         
         Returns:
             {
                 'category': 'spam',
                 'confidence': 0.95,
-                'scores': {'ham': 0.02, 'spam': 0.95, ...},
+                'scores': {'ham': 0.05, 'spam': 0.95, 'phishing': 0.0},
                 'risk_level': 'high',
-                'flags': ['urgency_words', 'money_references'],
-                'language': 'en',
-                'explanation': {...}  # if requested
+                'flags': ['excessive_caps', 'urgency_words']
             }
         """
-        # Preprocess text
+        # 1. Preprocesar texto
         processed_text = preprocess_text(text)
         
-        # Extract rule-based features
+        # 2. Extraer features
         features = extract_features(text, context)
         
-        # Tokenize for BERT
-        inputs = self.tokenizer(
-            processed_text,
-            return_tensors='pt',
-            truncation=True,
-            max_length=512,
-            padding=True
-        )
-        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        # 3. Predecir con modelo (si existe)
+        if self.model and self.vectorizer:
+            prediction = self._predict_with_model(processed_text, features)
+        else:
+            # Fallback a reglas
+            prediction = self._predict_with_rules(features)
         
-        # Predict with model
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-            logits = outputs.logits
-            probs = torch.softmax(logits, dim=1)[0]
+        return prediction
+    
+    def _predict_with_model(self, text: str, features: Dict) -> Dict:
+        """Predicción con modelo ML"""
+        try:
+            # Vectorizar texto
+            X = self.vectorizer.transform([text])
+            
+            # Predecir
+            proba = self.model.predict_proba(X)[0]
+            pred_idx = np.argmax(proba)
+            
+            category = self.categories[pred_idx]
+            confidence = float(proba[pred_idx])
+            
+            scores = {
+                cat: float(prob) 
+                for cat, prob in zip(self.categories, proba)
+            }
+            
+            # Ajustar con reglas
+            category, confidence = self._adjust_with_rules(category, confidence, features)
+            
+            return {
+                'category': category,
+                'confidence': confidence,
+                'scores': scores,
+                'risk_level': self._calculate_risk_level(category, confidence, features),
+                'flags': self._extract_flags(features)
+            }
+        except Exception as e:
+            logger.error(f"Model prediction error: {str(e)}")
+            return self._predict_with_rules(features)
+    
+    def _predict_with_rules(self, features: Dict) -> Dict:
+        """Predicción basada en reglas (fallback)"""
+        spam_score = 0
         
-        # Get prediction
-        pred_idx = torch.argmax(probs).item()
-        category = self.labels[pred_idx]
-        confidence = probs[pred_idx].item()
+        # Reglas de spam
+        if features['excessive_caps_ratio'] > 0.3:
+            spam_score += 30
         
-        # All scores
+        if features['has_urgency_words']:
+            spam_score += 25
+        
+        if features['has_money_words']:
+            spam_score += 25
+        
+        if features['suspicious_link_count'] > 0:
+            spam_score += 20
+        
+        if features['spam_keyword_count'] > 0:
+            spam_score += features['spam_keyword_count'] * 10
+        
+        # Phishing checks
+        if features['has_phishing_url']:
+            return {
+                'category': 'phishing',
+                'confidence': 0.99,
+                'scores': {'ham': 0.0, 'spam': 0.01, 'phishing': 0.99},
+                'risk_level': 'critical',
+                'flags': self._extract_flags(features)
+            }
+        
+        # Determinar categoría
+        is_spam = spam_score > 50
+        confidence = min(spam_score / 100, 1.0)
+        category = 'spam' if is_spam else 'ham'
+        
         scores = {
-            label: float(prob)
-            for label, prob in zip(self.labels, probs)
+            'ham': 1 - confidence if is_spam else confidence,
+            'spam': confidence if is_spam else 1 - confidence,
+            'phishing': 0.0
         }
         
-        # Adjust based on rule-based features
-        category, confidence = self._adjust_with_rules(
-            category, confidence, features
-        )
-        
-        # Calculate risk level
-        risk_level = self._calculate_risk_level(category, confidence, features)
-        
-        # Extract flags
-        flags = self._extract_flags(features)
-        
-        result = {
+        return {
             'category': category,
             'confidence': confidence,
             'scores': scores,
-            'risk_level': risk_level,
-            'flags': flags,
-            'language': language or features.get('language', 'unknown')
+            'risk_level': self._calculate_risk_level(category, confidence, features),
+            'flags': self._extract_flags(features)
         }
-        
-        # Add explanation if requested
-        if return_explanation:
-            result['explanation'] = self._generate_explanation(
-                text, category, confidence, features, inputs, outputs
-            )
-        
-        return result
     
     def _adjust_with_rules(
         self,
         category: str,
         confidence: float,
         features: Dict
-    ) -> tuple[str, float]:
-        """Adjust ML prediction with rule-based features"""
+    ) -> tuple:
+        """Ajustar predicción ML con reglas"""
         
-        # Strong signals override ML
+        # Override fuerte: phishing
         if features['has_phishing_url']:
             return 'phishing', 0.99
         
-        if features['excessive_caps_ratio'] > 0.5 and features['has_money_words']:
-            if category == 'ham':
+        # Boost spam si hay múltiples señales
+        if category == 'ham':
+            if features['excessive_caps_ratio'] > 0.5 and features['has_money_words']:
                 category = 'spam'
                 confidence = max(confidence, 0.85)
         
-        if features['has_urgency_words'] and features['has_money_words']:
-            if category in ['ham', 'spam']:
+        # Boost confidence si hay urgencia + dinero
+        if category == 'spam':
+            if features['has_urgency_words'] and features['has_money_words']:
                 confidence = min(confidence + 0.1, 1.0)
-        
-        if features['suspicious_link_count'] >= 3:
-            if category == 'ham':
-                category = 'spam'
-                confidence = max(confidence, 0.75)
         
         return category, confidence
     
@@ -189,12 +200,12 @@ class MLModelPredictor:
         confidence: float,
         features: Dict
     ) -> str:
-        """Calculate risk level"""
+        """Calcular nivel de riesgo"""
         
         if category == 'ham':
             return 'low'
         
-        if category in ['phishing', 'fraud']:
+        if category == 'phishing':
             return 'critical'
         
         if category == 'spam':
@@ -205,23 +216,20 @@ class MLModelPredictor:
             else:
                 return 'low'
         
-        if category == 'ai_generated':
-            return 'medium'
-        
         return 'low'
     
     def _extract_flags(self, features: Dict) -> List[str]:
-        """Extract triggered flags"""
+        """Extraer flags activados"""
         flags = []
         
         if features['excessive_caps_ratio'] > 0.3:
-            flags.append('excessive_capitalization')
+            flags.append('excessive_caps')
         
         if features['has_urgency_words']:
             flags.append('urgency_words')
         
         if features['has_money_words']:
-            flags.append('money_references')
+            flags.append('money_words')
         
         if features['suspicious_link_count'] > 0:
             flags.append('suspicious_links')
@@ -229,45 +237,7 @@ class MLModelPredictor:
         if features['has_phishing_url']:
             flags.append('phishing_url')
         
-        if features.get('multiple_exclamation', 0) > 3:
-            flags.append('excessive_punctuation')
+        if features.get('spam_keyword_count', 0) > 0:
+            flags.append('spam_keywords')
         
         return flags
-    
-    def _generate_explanation(
-        self,
-        text: str,
-        category: str,
-        confidence: float,
-        features: Dict,
-        inputs: Dict,
-        outputs
-    ) -> Dict:
-        """Generate explanation for prediction"""
-        
-        explanation = {
-            'decision': f"Classified as '{category}' with {confidence:.1%} confidence",
-            'key_factors': []
-        }
-        
-        # Add key factors
-        if features['excessive_caps_ratio'] > 0.3:
-            explanation['key_factors'].append(
-                f"Excessive capitalization ({features['excessive_caps_ratio']:.1%})"
-            )
-        
-        if features['has_urgency_words']:
-            explanation['key_factors'].append("Contains urgency words")
-        
-        if features['has_money_words']:
-            explanation['key_factors'].append("Contains money-related terms")
-        
-        if features['suspicious_link_count'] > 0:
-            explanation['key_factors'].append(
-                f"{features['suspicious_link_count']} suspicious link(s)"
-            )
-        
-        # TODO: Add SHAP values or attention visualization
-        # explanation['attention_words'] = self._get_attention_words(inputs, outputs)
-        
-        return explanation
