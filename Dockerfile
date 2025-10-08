@@ -27,9 +27,6 @@ COPY --from=builder /root/.local /root/.local
 # Copy application code
 COPY ./app ./app
 
-# ⚠️ CAMBIO: Ya NO copiamos /ml porque usamos Railway Volume
-# El modelo se carga desde /data (Railway Volume)
-
 # Make sure scripts are usable
 ENV PATH=/root/.local/bin:$PATH
 
@@ -38,7 +35,7 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
-# Run with uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+# 🔥 FIX: Usar sh -c para interpolar $PORT correctamente
+CMD sh -c "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"
