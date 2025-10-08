@@ -1,5 +1,5 @@
 """
-SpamGuard API - Main Application
+SpamGuard API v3.0 Hybrid - Main Application
 """
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,7 +11,7 @@ import time
 import logging
 from app.config import settings
 from app.core.cache import init_redis
-from app.ml.model import MLModelPredictor
+from app.ml.model import MLPredictor
 from app.api.v1 import api_router
 
 # Logging
@@ -26,19 +26,25 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
     # Startup
-    logger.info("🚀 Starting SpamGuard API...")
+    logger.info("=" * 60)
+    logger.info(f"🚀 Starting {settings.PROJECT_NAME}")
+    logger.info(f"   Version: {settings.VERSION}")
+    logger.info(f"   Environment: {settings.ENVIRONMENT}")
+    logger.info("=" * 60)
     
-    # Initialize Redis
+    # Initialize Redis (optional)
     init_redis()
     
     # Preload ML model
     try:
-        MLModelPredictor.get_instance()
-        logger.info("✅ ML Model preloaded")
+        MLPredictor.get_instance()
+        logger.info("✅ ML Model ready")
     except Exception as e:
         logger.error(f"❌ Failed to load ML model: {str(e)}")
+        logger.warning("⚠️  Will use rule-based fallback")
     
     logger.info("✅ SpamGuard API is ready!")
+    logger.info("=" * 60)
     
     yield
     
@@ -52,7 +58,29 @@ app = FastAPI(
     version=settings.VERSION,
     docs_url="/docs" if settings.DEBUG else None,
     redoc_url="/redoc" if settings.DEBUG else None,
-    lifespan=lifespan
+    lifespan=lifespan,
+    openapi_tags=[
+        {
+            "name": "Registration",
+            "description": "Register and get your free API key"
+        },
+        {
+            "name": "Analysis",
+            "description": "Spam detection endpoints"
+        },
+        {
+            "name": "Feedback",
+            "description": "Submit feedback to improve the model"
+        },
+        {
+            "name": "Statistics",
+            "description": "Get your usage statistics"
+        },
+        {
+            "name": "Account",
+            "description": "Manage your account"
+        }
+    ]
 )
 
 # CORS
@@ -73,28 +101,33 @@ async def add_process_time_header(request: Request, call_next):
     start_time = time.time()
     response = await call_next(request)
     process_time = time.time() - start_time
-    response.headers["X-Process-Time"] = str(process_time)
+    response.headers["X-Process-Time"] = f"{process_time:.3f}"
+    response.headers["X-SpamGuard-Version"] = settings.VERSION
     return response
 
 # Exception handlers
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle validation errors"""
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
             "error": "Validation Error",
+            "message": "The request contains invalid data",
             "details": exc.errors()
         }
     )
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
+    """Handle general exceptions"""
     logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             "error": "Internal Server Error",
-            "message": "An unexpected error occurred. Please try again later."
+            "message": "An unexpected error occurred. Please try again later.",
+            "support": "support@spamguard.ai"
         }
     )
 
@@ -106,14 +139,14 @@ async def health_check():
     
     Returns system status and version info
     """
+    ml_status = "loaded" if MLPredictor._initialized else "not_loaded"
+    
     return {
         "status": "healthy",
         "version": settings.VERSION,
         "environment": settings.ENVIRONMENT,
-        "model": {
-            "loaded": MLModelPredictor._initialized,
-            "device": str(MLModelPredictor.get_instance().device) if MLModelPredictor._initialized else "unknown"
-        }
+        "model_status": ml_status,
+        "api_docs": "/docs" if settings.DEBUG else "https://docs.spamguard.ai"
     }
 
 # Root endpoint
@@ -121,22 +154,39 @@ async def health_check():
 async def root():
     """
     🏠 API Root
+    
+    Welcome to SpamGuard API v3.0 Hybrid!
     """
     return {
-        "message": "Welcome to SpamGuard API",
+        "message": "Welcome to SpamGuard API v3.0 Hybrid",
         "version": settings.VERSION,
+        "description": "Free spam detection API powered by machine learning",
+        "features": [
+            "Spam detection",
+            "Phishing detection",
+            "1,000 free requests/month",
+            "No credit card required"
+        ],
         "docs": "/docs" if settings.DEBUG else "https://docs.spamguard.ai",
-        "support": "https://spamguard.ai/support"
+        "register": f"{settings.API_V1_STR}/register",
+        "support": "support@spamguard.ai"
     }
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
-# Startup message
-@app.on_event("startup")
-async def startup_message():
-    logger.info("=" * 60)
-    logger.info(f"  {settings.PROJECT_NAME} v{settings.VERSION}")
-    logger.info(f"  Environment: {settings.ENVIRONMENT}")
-    logger.info(f"  Debug: {settings.DEBUG}")
-    logger.info("=" * 60)
+# Custom 404 handler
+@app.exception_handler(404)
+async def not_found_handler(request: Request, exc):
+    return JSONResponse(
+        status_code=404,
+        content={
+            "error": "Not Found",
+            "message": f"The endpoint {request.url.path} does not exist",
+            "available_endpoints": {
+                "docs": "/docs" if settings.DEBUG else "https://docs.spamguard.ai",
+                "register": f"{settings.API_V1_STR}/register",
+                "analyze": f"{settings.API_V1_STR}/analyze"
+            }
+        }
+    )
