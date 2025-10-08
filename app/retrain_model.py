@@ -1,5 +1,5 @@
 """
-Script de Reentrenamiento del Modelo SpamGuard
+Script de Reentrenamiento del Modelo SpamGuard v3.0 Hybrid
 Ejecutar manualmente: python app/retrain_model.py
 O programar con cron/Railway workers
 """
@@ -31,8 +31,8 @@ from sklearn.metrics import (
 
 # Importar configuración de la app
 try:
-    from app.database import supabase
-    from app.config import get_settings
+    from supabase import create_client
+    from app.config import settings
 except ImportError as e:
     print(f"❌ Error importando módulos: {e}")
     print("Asegúrate de ejecutar desde el directorio raíz del proyecto")
@@ -42,7 +42,11 @@ except ImportError as e:
 class ModelRetrainer:
     
     def __init__(self):
-        self.settings = get_settings()
+        # Supabase client
+        self.supabase = create_client(
+            settings.SUPABASE_URL,
+            settings.SUPABASE_SERVICE_KEY
+        )
         
         # Detectar si estamos en Railway con volumen persistente
         volume_path = os.getenv('RAILWAY_VOLUME_MOUNT_PATH')
@@ -65,20 +69,33 @@ class ModelRetrainer:
         self.models_dir.mkdir(parents=True, exist_ok=True)
         self.backups_dir.mkdir(exist_ok=True)
     
-    def fetch_training_data(self, min_samples=100):
+    def fetch_training_data(self, min_samples=100, user_id=None):
         """
         Obtener datos de entrenamiento desde Supabase
+        
+        Args:
+            min_samples: Mínimo de muestras requeridas
+            user_id: Si se especifica, entrena solo con datos de ese usuario
         """
         print("\n" + "="*60)
         print("📊 OBTENIENDO DATOS DE ENTRENAMIENTO")
+        if user_id:
+            print(f"   (Solo usuario: {user_id})")
+        else:
+            print("   (Todos los usuarios - v3.0 Hybrid)")
         print("="*60)
         
         try:
-            # Usar comment_content (nombre correcto de la columna)
-            response = supabase.table('comments_analyzed')\
-                .select('comment_content, actual_label, predicted_label, prediction_confidence')\
-                .not_.is_('actual_label', 'null')\
-                .execute()
+            # v3.0: Obtener de feedback_queue (multi-tenant)
+            query = self.supabase.table('feedback_queue')\
+                .select('*, comments_analyzed(*)')\
+                .eq('processed', False)
+            
+            # Filtrar por usuario si se especifica
+            if user_id:
+                query = query.eq('user_id', user_id)
+            
+            response = query.execute()
             
             data = response.data
             
@@ -86,10 +103,23 @@ class ModelRetrainer:
                 print("❌ No se encontraron datos de entrenamiento")
                 return None
             
-            df = pd.DataFrame(data)
+            # Procesar datos
+            processed_data = []
+            for item in data:
+                comment = item.get('comments_analyzed')
+                if comment and comment.get('comment_content'):
+                    processed_data.append({
+                        'content': comment['comment_content'],
+                        'actual_label': item['new_label'],
+                        'old_label': item['old_label'],
+                        'feedback_id': item['id']
+                    })
             
-            # Renombrar columna para consistencia
-            df = df.rename(columns={'comment_content': 'content'})
+            if not processed_data:
+                print("❌ No hay comentarios válidos para entrenar")
+                return None
+            
+            df = pd.DataFrame(processed_data)
             
             print(f"✅ Obtenidos {len(df)} comentarios con feedback")
             
@@ -132,7 +162,7 @@ class ModelRetrainer:
         # Convertir labels a binario (1=spam, 0=ham)
         df['label'] = (df['actual_label'] == 'spam').astype(int)
         
-        # Eliminar duplicados (ESTO reduce de 8721 a ~971)
+        # Eliminar duplicados
         original_len = len(df)
         df = df.drop_duplicates(subset=['content'])
         duplicates_removed = original_len - len(df)
@@ -295,9 +325,10 @@ class ModelRetrainer:
         metadata = {
             'trained_at': datetime.now().isoformat(),
             'training_samples': int(training_samples),
-            'unique_samples': int(training_samples),  # Después de eliminar duplicados
+            'unique_samples': int(training_samples),
             'metrics': metrics,
-            'model_version': '2.0'
+            'model_version': '3.0',  # ← v3.0 Hybrid
+            'api_version': 'v3.0-hybrid'
         }
         
         with open(self.metadata_path, 'w') as f:
@@ -306,6 +337,27 @@ class ModelRetrainer:
         print(f"✅ Metadata guardada: {self.metadata_path}")
         
         return metadata
+    
+    def mark_feedback_as_processed(self, df):
+        """
+        Marcar feedback como procesado (v3.0)
+        """
+        if 'feedback_id' not in df.columns:
+            return
+        
+        print("\n📝 Marcando feedback como procesado...")
+        
+        try:
+            feedback_ids = df['feedback_id'].tolist()
+            
+            self.supabase.table('feedback_queue')\
+                .update({'processed': True})\
+                .in_('id', feedback_ids)\
+                .execute()
+            
+            print(f"✅ {len(feedback_ids)} feedbacks marcados como procesados")
+        except Exception as e:
+            print(f"⚠️  Error marcando feedback: {e}")
     
     def compare_with_previous(self):
         """
@@ -326,16 +378,17 @@ class ModelRetrainer:
             print(f"Accuracy anterior: {old_acc:.4f}")
             print(f"Fecha entrenamiento: {old_metadata.get('trained_at', 'N/A')}")
             print(f"Muestras anteriores: {old_metadata.get('training_samples', 0)}")
+            print(f"Versión: {old_metadata.get('model_version', 'N/A')}")
             
         except Exception as e:
             print(f"⚠️  No se pudo cargar metadata anterior: {e}")
     
-    def run(self, min_samples=100):
+    def run(self, min_samples=100, user_id=None):
         """
         Ejecutar proceso completo de reentrenamiento
         """
         print("\n" + "🚀 " + "="*58 + " 🚀")
-        print("   SPAMGUARD AI - REENTRENAMIENTO DEL MODELO")
+        print("   SPAMGUARD AI v3.0 - REENTRENAMIENTO DEL MODELO")
         print("🚀 " + "="*58 + " 🚀\n")
         
         start_time = datetime.now()
@@ -344,7 +397,7 @@ class ModelRetrainer:
         self.compare_with_previous()
         
         # 2. Obtener datos
-        df = self.fetch_training_data(min_samples)
+        df = self.fetch_training_data(min_samples, user_id)
         if df is None:
             print("\n❌ Reentrenamiento cancelado: datos insuficientes")
             return False
@@ -364,7 +417,10 @@ class ModelRetrainer:
         # 6. Guardar modelo
         metadata = self.save_model(model, metrics, len(df))
         
-        # 7. Resumen final
+        # 7. Marcar feedback como procesado (v3.0)
+        self.mark_feedback_as_processed(df)
+        
+        # 8. Resumen final
         elapsed = (datetime.now() - start_time).total_seconds()
         
         print("\n" + "="*60)
@@ -374,8 +430,8 @@ class ModelRetrainer:
         print(f"📊 Accuracy: {metrics['test_accuracy']:.4f}")
         print(f"📈 F1 Score: {metrics['f1_score']:.4f}")
         print(f"🎯 Muestras únicas: {len(df)}")
-        print(f"📦 Guardado en volumen persistente")
-        print("\n🔄 Modelo listo - se cargará automáticamente en próximo deploy")
+        print(f"📦 Guardado en volumen persistente Railway")
+        print("\n🔄 Modelo listo - se cargará automáticamente")
         print("="*60 + "\n")
         
         return True
@@ -387,24 +443,30 @@ def main():
     """
     import argparse
     
-    parser = argparse.ArgumentParser(description='Reentrenar modelo de SpamGuard')
+    parser = argparse.ArgumentParser(description='Reentrenar modelo de SpamGuard v3.0')
     parser.add_argument(
         '--min-samples',
         type=int,
         default=100,
         help='Mínimo de muestras requeridas (default: 100)'
     )
+    parser.add_argument(
+        '--user-id',
+        type=str,
+        default=None,
+        help='Entrenar solo con datos de un usuario específico (opcional)'
+    )
     
     args = parser.parse_args()
     
     retrainer = ModelRetrainer()
-    success = retrainer.run(min_samples=args.min_samples)
+    success = retrainer.run(
+        min_samples=args.min_samples,
+        user_id=args.user_id
+    )
     
     sys.exit(0 if success else 1)
 
-
-if __name__ == '__main__':
-    main()
 
 if __name__ == '__main__':
     main()
