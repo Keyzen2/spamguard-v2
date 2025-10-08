@@ -33,7 +33,7 @@ class MLPredictor:
         return instance
     
     def _initialize(self):
-        """Cargar modelo desde Railway Volume o local"""
+        """Cargar modelo desde Railway Volume o fallback"""
         logger.info("🤖 Loading ML Model...")
         
         try:
@@ -43,21 +43,21 @@ class MLPredictor:
             if volume_path:
                 # Usar modelo desde volumen persistente
                 model_dir = Path(volume_path) / 'models'
+                model_path = model_dir / 'spam_model.pkl'
                 logger.info(f"   Using Railway Volume: {volume_path}")
             else:
-                # Usar modelo local (desarrollo)
-                model_dir = Path(settings.MODEL_PATH)
-                logger.info(f"   Using local path: {model_dir}")
+                # Desarrollo local: buscar en directorio actual
+                model_dir = Path('.')
+                model_path = model_dir / 'models' / 'spam_model.pkl'
+                logger.info(f"   Using local path: {model_path}")
             
-            model_path = model_dir / 'spam_model.pkl'
-            metadata_path = model_dir / 'model_metadata.json'
-            
-            # Cargar modelo
+            # Cargar modelo si existe
             if model_path.exists():
                 self.model = joblib.load(model_path)
-                logger.info("   ✅ Model loaded from volume/disk")
+                logger.info("   ✅ Model loaded")
                 
-                # Cargar metadata si existe
+                # Cargar metadata
+                metadata_path = model_dir / 'model_metadata.json'
                 if metadata_path.exists():
                     import json
                     with open(metadata_path, 'r') as f:
@@ -65,7 +65,8 @@ class MLPredictor:
                     logger.info(f"   📊 Model version: {metadata.get('model_version', 'unknown')}")
                     logger.info(f"   📈 Accuracy: {metadata.get('metrics', {}).get('test_accuracy', 0):.2%}")
             else:
-                logger.warning("   ⚠️ Model not found, using rule-based fallback")
+                logger.warning("   ⚠️ Model not found - using rule-based fallback")
+                logger.warning(f"   Expected path: {model_path}")
                 self.model = None
             
             self.categories = ['ham', 'spam', 'phishing']
