@@ -1,3 +1,5 @@
+# Multi-stage build for production
+
 # Stage 1: Builder
 FROM python:3.11-slim as builder
 
@@ -24,7 +26,9 @@ COPY --from=builder /root/.local /root/.local
 
 # Copy application code
 COPY ./app ./app
-COPY ./ml ./ml
+
+# ⚠️ CAMBIO: Ya NO copiamos /ml porque usamos Railway Volume
+# El modelo se carga desde /data (Railway Volume)
 
 # Make sure scripts are usable
 ENV PATH=/root/.local/bin:$PATH
