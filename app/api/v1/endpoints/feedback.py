@@ -1,38 +1,14 @@
 """
-Feedback endpoint: Improve model with user corrections
+Feedback endpoint
 """
-from fastapi import APIRouter, Depends, BackgroundTasks, status
-from pydantic import BaseModel, Field
-from typing import Optional
+from fastapi import APIRouter, Depends, BackgroundTasks
+from app.db.schemas import FeedbackRequest, FeedbackResponse
 from app.core.security import verify_api_key
 from app.db.crud import save_feedback
 from datetime import datetime
+import uuid
 
 router = APIRouter()
-
-class FeedbackRequest(BaseModel):
-    request_id: Optional[str] = Field(None, description="Original request ID (if available)")
-    text: str = Field(..., min_length=1, max_length=50000)
-    predicted_category: str = Field(..., description="What we predicted")
-    correct_category: str = Field(..., description="What it actually is")
-    confidence: Optional[float] = Field(None, ge=0, le=1)
-    notes: Optional[str] = Field(None, max_length=1000, description="Additional notes")
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "request_id": "req_abc123",
-                "text": "This is a legitimate message",
-                "predicted_category": "spam",
-                "correct_category": "ham",
-                "notes": "False positive - this was from a real customer"
-            }
-        }
-
-class FeedbackResponse(BaseModel):
-    success: bool
-    message: str
-    feedback_id: str
 
 @router.post("/feedback", response_model=FeedbackResponse, status_code=201)
 async def submit_feedback(
@@ -43,37 +19,29 @@ async def submit_feedback(
     """
     📝 Submit feedback to improve the model
     
-    Help us improve by reporting false positives/negatives.
-    Your feedback is used to retrain the model periodically.
+    Help us improve by reporting:
+    - False positives (spam marked as legitimate)
+    - False negatives (legitimate marked as spam)
     
-    ## Categories
-    - ham
-    - spam
-    - phishing
-    - ai_generated
-    - fraud
+    Your feedback helps train better models for everyone!
     """
-    import uuid
-    
     feedback_id = f"fb_{uuid.uuid4().hex[:12]}"
     
-    # Save feedback
     feedback_data = {
         'id': feedback_id,
         'user_id': user['user_id'],
-        'request_id': request.request_id,
-        'text': request.text,
-        'predicted_category': request.predicted_category,
-        'correct_category': request.correct_category,
-        'confidence': request.confidence,
-        'notes': request.notes,
+        'site_id': None,  # v3.0: no usamos site_id
+        'old_label': request.predicted_category,
+        'new_label': request.correct_category,
+        'processed': False,
         'created_at': datetime.now().isoformat()
     }
     
+    # Guardar en background
     background_tasks.add_task(save_feedback, feedback_data)
     
     return FeedbackResponse(
         success=True,
-        message="Thank you for your feedback! It will help improve our model.",
+        message="Thank you! Your feedback will help improve our model.",
         feedback_id=feedback_id
     )
