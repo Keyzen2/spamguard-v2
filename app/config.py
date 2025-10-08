@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     
     # Redis Cache (opcional por ahora)
-    REDIS_URL: str = None
+    REDIS_URL: str | None = None
     CACHE_TTL: int = 300  # 5 minutos
     
     # ML Model
