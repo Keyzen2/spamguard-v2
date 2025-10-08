@@ -1,0 +1,630 @@
+# Spanish translations for SpamGuard Backend
+# Copyright (C) 2025 SpamGuard Team
+# This file is distributed under the same license as the SpamGuard package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: SpamGuard Backend 2.0.0\n"
+"Report-Msgid-Bugs-To: support@spamguard.ai\n"
+"POT-Creation-Date: 2025-01-07 10:00+0000\n"
+"PO-Revision-Date: 2025-01-07 10:00+0000\n"
+"Last-Translator: SpamGuard Team <team@spamguard.ai>\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+# ============================================
+# GENERAL
+# ============================================
+msgid "healthy"
+msgstr "saludable"
+
+msgid "unhealthy"
+msgstr "no saludable"
+
+msgid "System is running correctly"
+msgstr "El sistema funciona correctamente"
+
+msgid "Database connection established"
+msgstr "Conexión a base de datos establecida"
+
+msgid "Model loaded successfully"
+msgstr "Modelo cargado exitosamente"
+
+msgid "Success"
+msgstr "Éxito"
+
+msgid "Error"
+msgstr "Error"
+
+msgid "Warning"
+msgstr "Advertencia"
+
+msgid "Info"
+msgstr "Información"
+
+# ============================================
+# AUTHENTICATION & AUTHORIZATION
+# ============================================
+msgid "Invalid API key"
+msgstr "Clave API inválida"
+
+msgid "API key is required"
+msgstr "Se requiere clave API"
+
+msgid "Permission denied"
+msgstr "Permiso denegado"
+
+msgid "Unauthorized access"
+msgstr "Acceso no autorizado"
+
+msgid "Site registered successfully"
+msgstr "Sitio registrado exitosamente"
+
+msgid "API key generated"
+msgstr "Clave API generada"
+
+# ============================================
+# ANTI-SPAM
+# ============================================
+msgid "Comment analyzed successfully"
+msgstr "Comentario analizado exitosamente"
+
+msgid "Comment classified as spam"
+msgstr "Comentario clasificado como spam"
+
+msgid "Comment classified as legitimate"
+msgstr "Comentario clasificado como legítimo"
+
+msgid "Confidence level"
+msgstr "Nivel de confianza"
+
+msgid "Analyzing comment..."
+msgstr "Analizando comentario..."
+
+msgid "Machine learning model prediction"
+msgstr "Predicción del modelo de aprendizaje automático"
+
+msgid "Honeypot triggered"
+msgstr "Honeypot activado"
+
+msgid "Time check failed"
+msgstr "Verificación de tiempo falló"
+
+msgid "Suspicious patterns detected"
+msgstr "Patrones sospechosos detectados"
+
+msgid "Feedback received successfully"
+msgstr "Retroalimentación recibida exitosamente"
+
+msgid "Model will be retrained with this feedback"
+msgstr "El modelo será reentrenado con esta retroalimentación"
+
+# ============================================
+# ANTIVIRUS / MALWARE SCANNING
+# ============================================
+msgid "Scan started successfully"
+msgstr "Escaneo iniciado exitosamente"
+
+msgid "Scanning files..."
+msgstr "Escaneando archivos..."
+
+msgid "Scan in progress"
+msgstr "Escaneo en progreso"
+
+msgid "Scan completed"
+msgstr "Escaneo completado"
+
+msgid "Scan failed"
+msgstr "Escaneo falló"
+
+msgid "Quick scan"
+msgstr "Escaneo rápido"
+
+msgid "Full scan"
+msgstr "Escaneo completo"
+
+msgid "Custom scan"
+msgstr "Escaneo personalizado"
+
+msgid "files scanned"
+msgstr "archivos escaneados"
+
+msgid "threats found"
+msgstr "amenazas encontradas"
+
+msgid "No threats detected"
+msgstr "No se detectaron amenazas"
+
+msgid "Critical threat detected"
+msgstr "Amenaza crítica detectada"
+
+msgid "High severity threat"
+msgstr "Amenaza de alta severidad"
+
+msgid "Medium severity threat"
+msgstr "Amenaza de severidad media"
+
+msgid "Low severity threat"
+msgstr "Amenaza de baja severidad"
+
+msgid "Malware found in file"
+msgstr "Malware encontrado en archivo"
+
+msgid "Suspicious code detected"
+msgstr "Código sospechoso detectado"
+
+msgid "Obfuscated code found"
+msgstr "Código ofuscado encontrado"
+
+msgid "Backdoor detected"
+msgstr "Backdoor detectado"
+
+msgid "Shell script found"
+msgstr "Script shell encontrado"
+
+msgid "eval() with base64 detected"
+msgstr "eval() con base64 detectado"
+
+msgid "Dangerous function usage"
+msgstr "Uso de función peligrosa"
+
+msgid "File quarantined successfully"
+msgstr "Archivo puesto en cuarentena exitosamente"
+
+msgid "Threat resolved"
+msgstr "Amenaza resuelta"
+
+msgid "Threat ignored"
+msgstr "Amenaza ignorada"
+
+msgid "Machine learning confidence"
+msgstr "Confianza del aprendizaje automático"
+
+msgid "Signature matched"
+msgstr "Firma coincidente"
+
+msgid "Behavioral analysis result"
+msgstr "Resultado del análisis de comportamiento"
+
+# ============================================
+# VULNERABILITY CHECKING
+# ============================================
+msgid "Checking for vulnerabilities..."
+msgstr "Verificando vulnerabilidades..."
+
+msgid "Vulnerability check completed"
+msgstr "Verificación de vulnerabilidades completada"
+
+msgid "vulnerabilities found"
+msgstr "vulnerabilidades encontradas"
+
+msgid "No vulnerabilities found"
+msgstr "No se encontraron vulnerabilidades"
+
+msgid "Your WordPress version is outdated"
+msgstr "Tu versión de WordPress está desactualizada"
+
+msgid "Update available"
+msgstr "Actualización disponible"
+
+msgid "Plugin has known vulnerabilities"
+msgstr "El plugin tiene vulnerabilidades conocidas"
+
+msgid "Theme has security issues"
+msgstr "El tema tiene problemas de seguridad"
+
+msgid "Critical vulnerability"
+msgstr "Vulnerabilidad crítica"
+
+msgid "High risk vulnerability"
+msgstr "Vulnerabilidad de alto riesgo"
+
+msgid "Medium risk vulnerability"
+msgstr "Vulnerabilidad de riesgo medio"
+
+msgid "Low risk vulnerability"
+msgstr "Vulnerabilidad de bajo riesgo"
+
+msgid "CVE ID"
+msgstr "ID CVE"
+
+msgid "Fixed in version"
+msgstr "Corregido en versión"
+
+msgid "Affects version"
+msgstr "Afecta a versión"
+
+msgid "Vulnerability type"
+msgstr "Tipo de vulnerabilidad"
+
+msgid "SQL Injection"
+msgstr "Inyección SQL"
+
+msgid "Cross-Site Scripting"
+msgstr "Cross-Site Scripting"
+
+msgid "Remote Code Execution"
+msgstr "Ejecución Remota de Código"
+
+msgid "Local File Inclusion"
+msgstr "Inclusión de Archivo Local"
+
+msgid "Authentication Bypass"
+msgstr "Evasión de Autenticación"
+
+msgid "CSRF Vulnerability"
+msgstr "Vulnerabilidad CSRF"
+
+# ============================================
+# WORDPRESS CORE INTEGRITY
+# ============================================
+msgid "Checking WordPress core integrity..."
+msgstr "Verificando integridad del núcleo de WordPress..."
+
+msgid "Core integrity check completed"
+msgstr "Verificación de integridad del núcleo completada"
+
+msgid "modified files detected"
+msgstr "archivos modificados detectados"
+
+msgid "missing files detected"
+msgstr "archivos faltantes detectados"
+
+msgid "WordPress core is intact"
+msgstr "El núcleo de WordPress está intacto"
+
+msgid "File has been modified"
+msgstr "El archivo ha sido modificado"
+
+msgid "File is missing"
+msgstr "El archivo falta"
+
+msgid "Unexpected file found in core"
+msgstr "Archivo inesperado encontrado en el núcleo"
+
+msgid "Hash mismatch detected"
+msgstr "Discrepancia de hash detectada"
+
+msgid "Integrity score"
+msgstr "Puntuación de integridad"
+
+# ============================================
+# FILE INTEGRITY MONITORING
+# ============================================
+msgid "Baseline created successfully"
+msgstr "Línea base creada exitosamente"
+
+msgid "Monitoring file changes..."
+msgstr "Monitoreando cambios de archivos..."
+
+msgid "File changes detected"
+msgstr "Cambios de archivos detectados"
+
+msgid "No changes detected"
+msgstr "No se detectaron cambios"
+
+msgid "File added"
+msgstr "Archivo añadido"
+
+msgid "File modified"
+msgstr "Archivo modificado"
+
+msgid "File deleted"
+msgstr "Archivo eliminado"
+
+msgid "Permissions changed"
+msgstr "Permisos cambiados"
+
+msgid "files monitored"
+msgstr "archivos monitoreados"
+
+msgid "changes pending review"
+msgstr "cambios pendientes de revisión"
+
+msgid "Change marked as legitimate"
+msgstr "Cambio marcado como legítimo"
+
+msgid "Change marked as suspicious"
+msgstr "Cambio marcado como sospechoso"
+
+# ============================================
+# FIREWALL / WAF
+# ============================================
+msgid "IP blocked successfully"
+msgstr "IP bloqueada exitosamente"
+
+msgid "IP unblocked successfully"
+msgstr "IP desbloqueada exitosamente"
+
+msgid "Malicious activity detected"
+msgstr "Actividad maliciosa detectada"
+
+msgid "SQL injection attempt blocked"
+msgstr "Intento de inyección SQL bloqueado"
+
+msgid "XSS attack prevented"
+msgstr "Ataque XSS prevenido"
+
+msgid "Path traversal blocked"
+msgstr "Traversal de ruta bloqueado"
+
+msgid "Command injection blocked"
+msgstr "Inyección de comando bloqueada"
+
+msgid "Rate limit exceeded"
+msgstr "Límite de velocidad excedido"
+
+msgid "Suspicious request pattern"
+msgstr "Patrón de solicitud sospechoso"
+
+msgid "Firewall rule triggered"
+msgstr "Regla de firewall activada"
+
+msgid "Request blocked by WAF"
+msgstr "Solicitud bloqueada por WAF"
+
+msgid "Attack prevented"
+msgstr "Ataque prevenido"
+
+msgid "IP added to blocklist"
+msgstr "IP añadida a lista de bloqueo"
+
+msgid "Threat score too high"
+msgstr "Puntuación de amenaza demasiado alta"
+
+# ============================================
+# THREAT INTELLIGENCE
+# ============================================
+msgid "Checking IP reputation..."
+msgstr "Verificando reputación de IP..."
+
+msgid "IP reputation check completed"
+msgstr "Verificación de reputación de IP completada"
+
+msgid "IP is malicious"
+msgstr "IP es maliciosa"
+
+msgid "IP is clean"
+msgstr "IP está limpia"
+
+msgid "IP has suspicious activity"
+msgstr "IP tiene actividad sospechosa"
+
+msgid "Abuse confidence score"
+msgstr "Puntuación de confianza de abuso"
+
+msgid "Total reports"
+msgstr "Reportes totales"
+
+msgid "Country of origin"
+msgstr "País de origen"
+
+msgid "ISP information"
+msgstr "Información del ISP"
+
+msgid "Known for"
+msgstr "Conocida por"
+
+msgid "Hacking attempts"
+msgstr "Intentos de hackeo"
+
+msgid "Spam activity"
+msgstr "Actividad de spam"
+
+msgid "Brute force attacks"
+msgstr "Ataques de fuerza bruta"
+
+# ============================================
+# STATISTICS & DASHBOARD
+# ============================================
+msgid "Dashboard statistics retrieved"
+msgstr "Estadísticas del panel obtenidas"
+
+msgid "Total sites protected"
+msgstr "Total de sitios protegidos"
+
+msgid "Comments analyzed today"
+msgstr "Comentarios analizados hoy"
+
+msgid "Spam blocked today"
+msgstr "Spam bloqueado hoy"
+
+msgid "Active threats"
+msgstr "Amenazas activas"
+
+msgid "Scans completed"
+msgstr "Escaneos completados"
+
+msgid "Average accuracy"
+msgstr "Precisión promedio"
+
+msgid "Model performance"
+msgstr "Rendimiento del modelo"
+
+msgid "Security score"
+msgstr "Puntuación de seguridad"
+
+msgid "System uptime"
+msgstr "Tiempo de actividad del sistema"
+
+# ============================================
+# ERRORS & EXCEPTIONS
+# ============================================
+msgid "An error occurred"
+msgstr "Ocurrió un error"
+
+msgid "Internal server error"
+msgstr "Error interno del servidor"
+
+msgid "Database connection failed"
+msgstr "Conexión a base de datos falló"
+
+msgid "Database query error"
+msgstr "Error de consulta de base de datos"
+
+msgid "File not found"
+msgstr "Archivo no encontrado"
+
+msgid "Invalid file path"
+msgstr "Ruta de archivo inválida"
+
+msgid "Permission error"
+msgstr "Error de permisos"
+
+msgid "Cannot read file"
+msgstr "No se puede leer el archivo"
+
+msgid "Cannot write file"
+msgstr "No se puede escribir el archivo"
+
+msgid "Invalid request data"
+msgstr "Datos de solicitud inválidos"
+
+msgid "Missing required field"
+msgstr "Campo requerido faltante"
+
+msgid "Invalid data format"
+msgstr "Formato de datos inválido"
+
+msgid "Operation timed out"
+msgstr "Operación agotó el tiempo de espera"
+
+msgid "Service unavailable"
+msgstr "Servicio no disponible"
+
+msgid "Too many requests"
+msgstr "Demasiadas solicitudes"
+
+msgid "Resource not found"
+msgstr "Recurso no encontrado"
+
+msgid "Conflict detected"
+msgstr "Conflicto detectado"
+
+msgid "Validation error"
+msgstr "Error de validación"
+
+# ============================================
+# NOTIFICATIONS
+# ============================================
+msgid "Email notification sent"
+msgstr "Notificación por correo enviada"
+
+msgid "Webhook triggered"
+msgstr "Webhook activado"
+
+msgid "Alert created"
+msgstr "Alerta creada"
+
+msgid "Critical alert"
+msgstr "Alerta crítica"
+
+msgid "Security notification"
+msgstr "Notificación de seguridad"
+
+msgid "Scan report ready"
+msgstr "Informe de escaneo listo"
+
+msgid "Action required"
+msgstr "Acción requerida"
+
+msgid "Immediate attention needed"
+msgstr "Se necesita atención inmediata"
+
+# ============================================
+# PLURAL FORMS
+# ============================================
+msgid "{count} file scanned"
+msgid_plural "{count} files scanned"
+msgstr[0] "{count} archivo escaneado"
+msgstr[1] "{count} archivos escaneados"
+
+msgid "{count} threat detected"
+msgid_plural "{count} threats detected"
+msgstr[0] "{count} amenaza detectada"
+msgstr[1] "{count} amenazas detectadas"
+
+msgid "{count} vulnerability found"
+msgid_plural "{count} vulnerabilities found"
+msgstr[0] "{count} vulnerabilidad encontrada"
+msgstr[1] "{count} vulnerabilidades encontradas"
+
+msgid "{count} file modified"
+msgid_plural "{count} files modified"
+msgstr[0] "{count} archivo modificado"
+msgstr[1] "{count} archivos modificados"
+
+msgid "{count} IP blocked"
+msgid_plural "{count} IPs blocked"
+msgstr[0] "{count} IP bloqueada"
+msgstr[1] "{count} IPs bloqueadas"
+
+msgid "{count} day ago"
+msgid_plural "{count} days ago"
+msgstr[0] "hace {count} día"
+msgstr[1] "hace {count} días"
+
+msgid "{count} hour ago"
+msgid_plural "{count} hours ago"
+msgstr[0] "hace {count} hora"
+msgstr[1] "hace {count} horas"
+
+msgid "{count} minute ago"
+msgid_plural "{count} minutes ago"
+msgstr[0] "hace {count} minuto"
+msgstr[1] "hace {count} minutos"
+
+# ============================================
+# MESSAGES WITH CONTEXT
+# ============================================
+msgctxt "scan status"
+msgid "pending"
+msgstr "pendiente"
+
+msgctxt "scan status"
+msgid "running"
+msgstr "ejecutándose"
+
+msgctxt "scan status"
+msgid "completed"
+msgstr "completado"
+
+msgctxt "scan status"
+msgid "failed"
+msgstr "fallido"
+
+msgctxt "threat status"
+msgid "active"
+msgstr "activa"
+
+msgctxt "threat status"
+msgid "quarantined"
+msgstr "en cuarentena"
+
+msgctxt "threat status"
+msgid "resolved"
+msgstr "resuelta"
+
+msgctxt "threat status"
+msgid "ignored"
+msgstr "ignorada"
+
+msgctxt "severity level"
+msgid "critical"
+msgstr "crítico"
+
+msgctxt "severity level"
+msgid "high"
+msgstr "alto"
+
+msgctxt "severity level"
+msgid "medium"
+msgstr "medio"
+
+msgctxt "severity level"
+msgid "low"
+msgstr "bajo"
