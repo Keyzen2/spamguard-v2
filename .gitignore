@@ -8,10 +8,22 @@ env/
 venv/
 ENV/
 build/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
+.installed.cfg
+*.egg
 
-# Environment variables - CRÍTICO
+# Environment
 .env
 .env.local
 .env.*.local
@@ -21,14 +33,25 @@ dist/
 .idea/
 *.swp
 *.swo
-
-# Models
-models/*.pkl
-models/*.joblib
-
-# Logs
-*.log
+*~
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# ML Models
+ml/models/*.pkl
+ml/models/*.joblib
+ml/data/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Redis
+dump.rdb
