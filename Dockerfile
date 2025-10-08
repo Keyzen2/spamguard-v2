@@ -27,11 +27,17 @@ COPY --from=builder /root/.local /root/.local
 # Copy application code
 COPY ./app ./app
 
+# Copy startup script
+COPY start.sh .
+
+# Make startup script executable
+RUN chmod +x start.sh
+
 # Make sure scripts are usable
 ENV PATH=/root/.local/bin:$PATH
 
 # Expose port
 EXPOSE 8000
 
-# CRITICAL: Use shell form to allow variable expansion
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2
+# Use startup script as CMD
+CMD ["./start.sh"]
