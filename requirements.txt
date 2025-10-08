@@ -31,7 +31,7 @@ passlib[bcrypt]==1.7.4
 # Utilities
 python-dotenv==1.0.0
 
-# Monitoring (optional)
+# (optional)
 sentry-sdk==1.38.0
 
 # Testing
