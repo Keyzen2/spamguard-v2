@@ -6,7 +6,13 @@ class Settings(BaseSettings):
     # Project
     PROJECT_NAME: str = "SpamGuard API"
     VERSION: str = "3.0.0"
+    DESCRIPTION: str = "Free spam detection API powered by machine learning"
     ENVIRONMENT: str = "production"
+    DEBUG: bool = False
+    LOG_LEVEL: str = "INFO"  # ← AGREGAR ESTA LÍNEA
+    
+    # API
+    API_V1_STR: str = "/api/v1"
     
     # API Keys
     API_KEY_PREFIX: str = "sg"
@@ -29,16 +35,6 @@ class Settings(BaseSettings):
     
     # ML Model
     MODEL_PATH: str = "ml/models/spam_model_v1"
-    
-    @property
-    def cors_origins_list(self) -> List[str]:
-        """Parse CORS origins from string or list"""
-        if isinstance(self.CORS_ORIGINS, str):
-            try:
-                return json.loads(self.CORS_ORIGINS)
-            except:
-                return [origin.strip() for origin in self.CORS_ORIGINS.split(',') if origin.strip()]
-        return self.CORS_ORIGINS
     
     class Config:
         env_file = ".env"
