@@ -10,13 +10,12 @@ from contextlib import asynccontextmanager
 import time
 import logging
 from app.config import settings
-from app.core.cache import init_redis
 from app.ml.model import MLPredictor
 from app.api.v1 import api_router
 
 # Logging
 logging.basicConfig(
-    level=settings.LOG_LEVEL,
+    level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -32,8 +31,13 @@ async def lifespan(app: FastAPI):
     logger.info(f"   Environment: {settings.ENVIRONMENT}")
     logger.info("=" * 60)
     
-    # Initialize Redis (optional)
-    init_redis()
+    # Initialize cache (Redis optional)
+    try:
+        from app.core.cache import init_redis
+        init_redis()
+    except Exception as e:
+        logger.warning(f"⚠️  Cache initialization warning: {e}")
+        logger.info("   Using in-memory cache as fallback")
     
     # Preload ML model
     try:
@@ -141,11 +145,19 @@ async def health_check():
     """
     ml_status = "loaded" if MLPredictor._initialized else "not_loaded"
     
+    # Check cache status
+    try:
+        from app.core.cache import redis_client
+        cache_status = "redis" if redis_client else "memory"
+    except:
+        cache_status = "memory"
+    
     return {
         "status": "healthy",
         "version": settings.VERSION,
         "environment": settings.ENVIRONMENT,
         "model_status": ml_status,
+        "cache_status": cache_status,
         "api_docs": "/docs" if settings.DEBUG else "https://docs.spamguard.ai"
     }
 
