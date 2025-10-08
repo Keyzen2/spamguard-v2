@@ -27,17 +27,8 @@ COPY --from=builder /root/.local /root/.local
 # Copy application code
 COPY ./app ./app
 
-# Copy startup script
-COPY start.sh .
-
-# Make startup script executable
-RUN chmod +x start.sh
-
 # Make sure scripts are usable
 ENV PATH=/root/.local/bin:$PATH
 
 # Expose port
 EXPOSE 8000
-
-# Use startup script as CMD
-CMD ["./start.sh"]
