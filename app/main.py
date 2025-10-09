@@ -18,6 +18,14 @@ from app.ml_model import get_detector
 # IMPORTAR ROUTERS
 from app.api.routes import router as spam_router
 
+# Vulnerabilities router 🆕 NUEVO
+try:
+    from app.api.routes_vulnerabilities import router as vulnerabilities_router
+    VULNERABILITIES_AVAILABLE = True
+except ImportError:
+    VULNERABILITIES_AVAILABLE = False
+    logging.warning("routes_vulnerabilities.py not found")
+
 # Antivirus router (opcional)
 try:
     from app.api.routes_antivirus import router as antivirus_router
@@ -78,8 +86,8 @@ async def lifespan(app: FastAPI):
 
 # CREATE APP
 app = FastAPI(
-    title="SpamGuard API",
-    description="Intelligent Spam Detection & Security",
+    title="SpamGuard Security API",
+    description="Intelligent Spam Detection, Security & Vulnerability Scanning",
     version=settings.VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -144,13 +152,19 @@ async def general_exception_handler(request: Request, exc: Exception):
 async def root():
     """API Root"""
     return {
-        "message": "SpamGuard API v3.0",
+        "message": "SpamGuard Security API v3.0",
         "status": "operational",
         "version": settings.VERSION,
+        "features": [
+            "spam_detection",
+            "malware_scanning",
+            "vulnerability_checking"  # 🆕 NUEVO
+        ],
         "endpoints": {
             "docs": "/docs",
             "health": "/health",
-            "api": "/api/v1"
+            "spam_api": "/api/v1/analyze",
+            "vulnerabilities_api": "/api/v1/vulnerabilities"  # 🆕 NUEVO
         }
     }
 
@@ -168,7 +182,8 @@ async def health():
         return {
             "status": "healthy" if db_status == "connected" else "degraded",
             "version": settings.VERSION,
-            "database": db_status
+            "database": db_status,
+            "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
         return {
@@ -179,7 +194,7 @@ async def health():
 @app.get("/ping")
 async def ping():
     """Ping"""
-    return {"status": "ok"}
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}
 
 # DOCUMENTACION HTML
 @app.get("/docs/retrain.html", response_class=HTMLResponse, include_in_schema=False)
@@ -198,15 +213,20 @@ async def retrain_docs():
 
 # INCLUIR ROUTERS
 app.include_router(spam_router)
-logger.info("Spam router registered")
+logger.info("✅ Spam router registered")
+
+# 🆕 NUEVO: Vulnerabilities router
+if VULNERABILITIES_AVAILABLE:
+    app.include_router(vulnerabilities_router)
+    logger.info("✅ Vulnerabilities router registered")
 
 if ANTIVIRUS_AVAILABLE:
     app.include_router(antivirus_router)
-    logger.info("Antivirus router registered")
+    logger.info("✅ Antivirus router registered")
 
 if ML_ROUTER_AVAILABLE:
     app.include_router(ml_router)
-    logger.info("ML router registered")
+    logger.info("✅ ML router registered")
 
 # MAIN
 if __name__ == "__main__":
