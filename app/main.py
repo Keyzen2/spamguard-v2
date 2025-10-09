@@ -15,23 +15,26 @@ from datetime import datetime
 from app.config import get_settings
 from app.ml_model import get_detector
 
-# ========================================
 # IMPORTAR ROUTERS
-# ========================================
 from app.api.routes import router as spam_router
-from app.api.routes_antivirus import router as antivirus_router
 
-# ✅ Intentar importar ML router (puede no existir)
+# Antivirus router (opcional)
+try:
+    from app.api.routes_antivirus import router as antivirus_router
+    ANTIVIRUS_AVAILABLE = True
+except ImportError:
+    ANTIVIRUS_AVAILABLE = False
+    logging.warning("routes_antivirus.py not found")
+
+# ML router (opcional)
 try:
     from app.api.routes_ml import router as ml_router
     ML_ROUTER_AVAILABLE = True
 except ImportError:
     ML_ROUTER_AVAILABLE = False
-    logging.warning("⚠️ routes_ml.py not found - ML endpoints disabled")
+    logging.warning("routes_ml.py not found")
 
-# ========================================
-# CONFIGURACIÓN
-# ========================================
+# CONFIGURACION
 settings = get_settings()
 
 # Logging
@@ -42,57 +45,48 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ========================================
 # LIFESPAN EVENTS
-# ========================================
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Gestión de eventos de inicio y cierre"""
+    """Gestion de eventos de inicio y cierre"""
     # STARTUP
     logger.info("=" * 60)
-    logger.info("🚀 Starting SpamGuard API")
+    logger.info("Starting SpamGuard API")
     logger.info(f"Version: {settings.VERSION}")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
     logger.info("=" * 60)
     
     # Cargar modelo ML
     try:
-        logger.info("🤖 Loading ML Model...")
+        logger.info("Loading ML Model...")
         detector = get_detector()
         model_info = detector.get_model_info()
-        logger.info(f"✅ ML Model ready - Type: {model_info.get('model_type', 'unknown')}")
+        logger.info(f"ML Model ready - Type: {model_info.get('model_type', 'unknown')}")
         if model_info.get('nb_available'):
-            logger.info("   📊 Naive Bayes model loaded successfully")
+            logger.info("Naive Bayes model loaded successfully")
     except Exception as e:
-        logger.error(f"❌ Failed to load ML model: {str(e)}")
-        logger.warning("⚠️ Will use rule-based fallback")
+        logger.error(f"Failed to load ML model: {str(e)}")
+        logger.warning("Will use rule-based fallback")
     
-    logger.info("✅ SpamGuard API is ready!")
+    logger.info("SpamGuard API is ready!")
     logger.info("=" * 60)
     
     yield
     
     # SHUTDOWN
-    logger.info("👋 Shutting down SpamGuard API...")
+    logger.info("Shutting down SpamGuard API...")
 
-# ========================================
 # CREATE APP
-# ========================================
-
 app = FastAPI(
     title="SpamGuard API",
-    description="🛡️ Intelligent Spam Detection & Security",
+    description="Intelligent Spam Detection & Security",
     version=settings.VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan
 )
 
-# ========================================
 # MIDDLEWARE
-# ========================================
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -111,7 +105,7 @@ async def add_process_time_header(request: Request, call_next):
     import uuid
     request_id = str(uuid.uuid4())
     
-    logger.info(f"📥 {request.method} {request.url.path}")
+    logger.info(f"REQUEST: {request.method} {request.url.path}")
     
     response = await call_next(request)
     
@@ -119,14 +113,11 @@ async def add_process_time_header(request: Request, call_next):
     response.headers["X-Process-Time"] = f"{process_time:.3f}"
     response.headers["X-Request-ID"] = request_id
     
-    logger.info(f"📤 {request.method} {request.url.path} [{response.status_code}] [{process_time:.3f}s]")
+    logger.info(f"RESPONSE: {request.method} {request.url.path} [{response.status_code}] [{process_time:.3f}s]")
     
     return response
 
-# ========================================
 # EXCEPTION HANDLERS
-# ========================================
-
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(
@@ -139,7 +130,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    logger.error(f"❌ Error: {str(exc)}", exc_info=True)
+    logger.error(f"Error: {str(exc)}", exc_info=True)
     return JSONResponse(
         status_code=500,
         content={
@@ -148,15 +139,12 @@ async def general_exception_handler(request: Request, exc: Exception):
         }
     )
 
-# ========================================
 # ROOT ENDPOINTS
-# ========================================
-
 @app.get("/")
 async def root():
     """API Root"""
     return {
-        "message": "🛡️ SpamGuard API v3.0",
+        "message": "SpamGuard API v3.0",
         "status": "operational",
         "version": settings.VERSION,
         "endpoints": {
@@ -193,43 +181,34 @@ async def ping():
     """Ping"""
     return {"status": "ok"}
 
-# ========================================
-# DOCUMENTACIÓN HTML
-# ========================================
-
+# DOCUMENTACION HTML
 @app.get("/docs/retrain.html", response_class=HTMLResponse, include_in_schema=False)
 async def retrain_docs():
-    """Página de reentrenamiento ML"""
+    """Pagina de reentrenamiento ML"""
     html_file = Path(__file__).parent / "docs" / "retrain.html"
     
     if not html_file.exists():
-        logger.warning(f"⚠️ HTML file not found: {html_file}")
+        logger.warning(f"HTML file not found: {html_file}")
         return HTMLResponse(
-            content="<h1>404 - Documentation not found</h1><p>File: " + str(html_file) + "</p>",
+            content="<h1>404 - Documentation not found</h1>",
             status_code=404
         )
     
     return FileResponse(html_file)
 
-# ========================================
 # INCLUIR ROUTERS
-# ========================================
-
 app.include_router(spam_router)
-app.include_router(antivirus_router)
+logger.info("Spam router registered")
+
+if ANTIVIRUS_AVAILABLE:
+    app.include_router(antivirus_router)
+    logger.info("Antivirus router registered")
 
 if ML_ROUTER_AVAILABLE:
     app.include_router(ml_router)
-    logger.info("✅ ML router registered")
-else:
-    logger.warning("⚠️ ML router not available")
+    logger.info("ML router registered")
 
-logger.info("✅ Antivirus router registered")
-
-# ========================================
 # MAIN
-# ========================================
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
