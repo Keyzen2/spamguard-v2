@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpamGuard ML - Reentrenamiento</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #2d3748;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .subtitle {
+            color: #718096;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .card {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .card h3 {
+            color: #2d3748;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .input-group {
+            margin: 15px 0;
+        }
+        
+        label {
+            display: block;
+            color: #4a5568;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        input[type="text"],
+        input[type="number"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-secondary {
+            background: #48bb78;
+        }
+        
+        .btn-secondary:hover {
+            box-shadow: 0 10px 20px rgba(72, 187, 120, 0.4);
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+            font-size: 14px;
+        }
+        
+        .alert-info {
+            background: #bee3f8;
+            color: #2c5282;
+            border-left: 4px solid #3182ce;
+        }
+        
+        .alert-success {
+            background: #c6f6d5;
+            color: #22543d;
+            border-left: 4px solid #38a169;
+        }
+        
+        .alert-error {
+            background: #fed7d7;
+            color: #742a2a;
+            border-left: 4px solid #e53e3e;
+        }
+        
+        .alert-warning {
+            background: #fefcbf;
+            color: #744210;
+            border-left: 4px solid #d69e2e;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .stat-box {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            border: 2px solid #e2e8f0;
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #718096;
+            margin-top: 5px;
+        }
+        
+        pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            🧠 SpamGuard ML Training
+        </h1>
+        <p class="subtitle">Reentrenamiento manual del modelo Naive Bayes</p>
+        
+        <!-- Stats del modelo actual -->
+        <div class="card">
+            <h3>📊 Estadísticas Actuales</h3>
+            <div id="currentStats" class="alert alert-info">
+                Cargando información del modelo...
+            </div>
+            <div id="statsDisplay" class="stats hidden"></div>
+            <button class="btn btn-secondary" onclick="loadStats()">🔄 Actualizar</button>
+        </div>
+        
+        <!-- Feedback disponible -->
+        <div class="card">
+            <h3>💬 Feedback Disponible</h3>
+            <div id="feedbackStats" class="alert alert-info">
+                Cargando estadísticas de feedback...
+            </div>
+            <div id="feedbackDisplay" class="stats hidden"></div>
+        </div>
+        
+        <!-- Formulario de reentrenamiento -->
+        <div class="card">
+            <h3>🔄 Reentrenar Modelo</h3>
+            
+            <div class="input-group">
+                <label for="secretKey">🔐 ML Secret Key *</label>
+                <input 
+                    type="password" 
+                    id="secretKey" 
+                    placeholder="Ingresa la ML_SECRET_KEY de Railway"
+                    required
+                >
+            </div>
+            
+            <div class="input-group">
+                <label for="minSamples">📊 Mínimo de muestras</label>
+                <input 
+                    type="number" 
+                    id="minSamples" 
+                    value="100"
+                    min="50"
+                    max="10000"
+                >
+            </div>
+            
+            <div class="input-group">
+                <label for="userId">👤 User ID (opcional)</label>
+                <input 
+                    type="text" 
+                    id="userId" 
+                    placeholder="Dejar vacío para entrenar con todos los usuarios"
+                >
+            </div>
+            
+            <button class="btn" onclick="startRetraining()" id="retrainBtn">
+                🚀 Iniciar Reentrenamiento
+            </button>
+            
+            <div id="retrainResult" class="hidden"></div>
+        </div>
+        
+        <!-- Resultado del reentrenamiento -->
+        <div id="resultCard" class="card hidden">
+            <h3>✅ Resultado del Reentrenamiento</h3>
+            <div id="resultContent"></div>
+        </div>
+        
+        <!-- Instrucciones -->
+        <div class="card">
+            <h3>📚 Instrucciones</h3>
+            <ol style="padding-left: 20px; line-height: 1.8;">
+                <li>Asegúrate de tener al menos 100 feedbacks (50 spam + 50 ham)</li>
+                <li>Copia la <code>ML_SECRET_KEY</code> desde las variables de Railway</li>
+                <li>Ingresa la clave en el campo de arriba</li>
+                <li>Click en "Iniciar Reentrenamiento"</li>
+                <li>El proceso toma 30-120 segundos dependiendo de los datos</li>
+                <li>El nuevo modelo se cargará automáticamente en la API</li>
+            </ol>
+            
+            <div class="alert alert-warning" style="margin-top: 15px;">
+                <strong>⚠️ Importante:</strong> El reentrenamiento sobrescribirá el modelo actual. Se guardará un backup automático.
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = window.location.origin;
+        
+        // Cargar stats al inicio
+        window.onload = function() {
+            loadStats();
+            loadFeedbackStats();
+        };
+        
+        async function loadStats() {
+            const secretKey = document.getElementById('secretKey').value;
+            
+            if (!secretKey) {
+                document.getElementById('currentStats').innerHTML = 
+                    '<strong>ℹ️</strong> Ingresa la Secret Key para ver las estadísticas';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/api/v1/ml/model/info`, {
+                    headers: {
+                        'X-ML-Secret': secretKey
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.model_exists) {
+                    const meta = data.metadata;
+                    const metrics = meta.metrics || {};
+                    
+                    document.getElementById('currentStats').className = 'alert alert-success';
+                    document.getElementById('currentStats').innerHTML = 
+                        '<strong>✅ Modelo entrenado disponible</strong>';
+                    
+                    document.getElementById('statsDisplay').className = 'stats';
+                    document.getElementById('statsDisplay').innerHTML = `
+                        <div class="stat-box">
+                            <div class="stat-value">${(metrics.test_accuracy * 100).toFixed(1)}%</div>
+                            <div class="stat-label">Accuracy</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value">${meta.training_samples || 0}</div>
+                            <div class="stat-label">Muestras</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value">${(metrics.f1_score * 100).toFixed(1)}%</div>
+                            <div class="stat-label">F1 Score</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value">${new Date(meta.trained_at).toLocaleDateString()}</div>
+                            <div class="stat-label">Entrenado</div>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('currentStats').className = 'alert alert-warning';
+                    document.getElementById('currentStats').innerHTML = 
+                        '<strong>⚠️ No hay modelo entrenado</strong><br>Usa el formulario para entrenar el primer modelo.';
+                    document.getElementById('statsDisplay').className = 'stats hidden';
+                }
+            } catch (error) {
+                document.getElementById('currentStats').className = 'alert alert-error';
+                document.getElementById('currentStats').innerHTML = 
+                    '<strong>❌ Error:</strong> ' + error.message;
+            }
+        }
+        
+        async function loadFeedbackStats() {
+            const secretKey = document.getElementById('secretKey').value;
+            
+            if (!secretKey) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/api/v1/ml/feedback/stats`, {
+                    headers: {
+                        'X-ML-Secret': secretKey
+                    }
+                });
+                
+                const data = await response.json();
+                
+                const readyClass = data.ready_to_train ? 'alert-success' : 'alert-warning';
+                const readyIcon = data.ready_to_train ? '✅' : '⚠️';
+                
+                document.getElementById('feedbackStats').className = `alert ${readyClass}`;
+                document.getElementById('feedbackStats').innerHTML = 
+                    `<strong>${readyIcon} ${data.total_feedback} feedbacks disponibles</strong>`;
+                
+                document.getElementById('feedbackDisplay').className = 'stats';
+                document.getElementById('feedbackDisplay').innerHTML = `
+                    <div class="stat-box">
+                        <div class="stat-value">${data.total_feedback}</div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">${data.spam}</div>
+                        <div class="stat-label">Spam</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">${data.ham}</div>
+                        <div class="stat-label">Ham</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">${data.ready_to_train ? 'SÍ' : 'NO'}</div>
+                        <div class="stat-label">Listo</div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('feedbackStats').className = 'alert alert-error';
+                document.getElementById('feedbackStats').innerHTML = 
+                    '<strong>❌ Error:</strong> ' + error.message;
+            }
+        }
+        
+        async function startRetraining() {
+            const secretKey = document.getElementById('secretKey').value;
+            const minSamples = document.getElementById('minSamples').value;
+            const userId = document.getElementById('userId').value;
+            
+            if (!secretKey) {
+                alert('Por favor ingresa la ML Secret Key');
+                return;
+            }
+            
+            const btn = document.getElementById('retrainBtn');
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Reentrenando... <span class="spinner"></span>';
+            
+            document.getElementById('retrainResult').className = 'alert alert-info';
+            document.getElementById('retrainResult').innerHTML = 
+                '⏳ Reentrenamiento en progreso... Esto puede tomar 1-2 minutos.';
+            
+            try {
+                let url = `${API_URL}/api/v1/ml/retrain?min_samples=${minSamples}`;
+                if (userId) {
+                    url += `&user_id=${userId}`;
+                }
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-ML-Secret': secretKey
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('retrainResult').className = 'alert alert-success';
+                    document.getElementById('retrainResult').innerHTML = 
+                        '<strong>✅ Reentrenamiento completado exitosamente!</strong>';
+                    
+                    const meta = data.metadata;
+                    const metrics = meta.metrics || {};
+                    
+                    document.getElementById('resultCard').className = 'card';
+                    document.getElementById('resultContent').innerHTML = `
+                        <div class="stats">
+                            <div class="stat-box">
+                                <div class="stat-value">${(metrics.test_accuracy * 100).toFixed(1)}%</div>
+                                <div class="stat-label">Accuracy</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value">${(metrics.precision * 100).toFixed(1)}%</div>
+                                <div class="stat-label">Precision</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value">${(metrics.recall * 100).toFixed(1)}%</div>
+                                <div class="stat-label">Recall</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value">${(metrics.f1_score * 100).toFixed(1)}%</div>
+                                <div class="stat-label">F1 Score</div>
+                            </div>
+                        </div>
+                        <div class="alert alert-info" style="margin-top: 15px;">
+                            <strong>ℹ️ Entrenado con ${meta.training_samples} muestras</strong><br>
+                            Fecha: ${new Date(meta.trained_at).toLocaleString()}<br>
+                            Versión: ${meta.model_version}
+                        </div>
+                    `;
+                    
+                    // Recargar stats
+                    setTimeout(() => {
+                        loadStats();
+                        loadFeedbackStats();
+                    }, 1000);
+                } else {
+                    throw new Error(data.detail || 'Error desconocido');
+                }
+            } catch (error) {
+                document.getElementById('retrainResult').className = 'alert alert-error';
+                document.getElementById('retrainResult').innerHTML = 
+                    '<strong>❌ Error:</strong> ' + error.message;
+                document.getElementById('resultCard').className = 'card hidden';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🚀 Iniciar Reentrenamiento';
+            }
+        }
+    </script>
+</body>
+</html>
