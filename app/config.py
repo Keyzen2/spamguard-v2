@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: str
     
     # Database
-    DATABASE_URL: str
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
     
     # Security
     SECRET_KEY: str
