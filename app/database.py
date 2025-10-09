@@ -7,16 +7,17 @@ import uuid
 settings = get_settings()
 
 # Cliente Supabase
+# ⚠️ CAMBIO: Usar MAYÚSCULAS (como están definidas en config.py)
 supabase: Client = create_client(
-    settings.supabase_url,
-    settings.supabase_service_key
+    settings.SUPABASE_URL,      # ← ERA: settings.supabase_url
+    settings.SUPABASE_SERVICE_KEY  # ← ERA: settings.supabase_service_key
 )
 
 class Database:
     """Clase para manejar todas las operaciones de base de datos"""
     
     @staticmethod
-    def save_comment_analysis(  # ← SIN async
+    def save_comment_analysis(
         site_id: str,
         comment_data: Dict,
         features: Dict,
@@ -43,15 +44,15 @@ class Database:
             'created_at': datetime.utcnow().isoformat()
         }
         
-        supabase.table('comments_analyzed').insert(data).execute()  # ← SIN await
+        supabase.table('comments_analyzed').insert(data).execute()
         
         # Actualizar estadísticas
-        Database.update_site_stats(site_id, prediction['is_spam'])  # ← SIN await
+        Database.update_site_stats(site_id, prediction['is_spam'])
         
         return comment_id
     
     @staticmethod
-    def update_site_stats(site_id: str, is_spam: bool):  # ← SIN async
+    def update_site_stats(site_id: str, is_spam: bool):
         """Actualiza las estadísticas del sitio"""
         
         # Obtener stats actuales
@@ -82,7 +83,7 @@ class Database:
             supabase.table('site_stats').insert(new_stats).execute()
     
     @staticmethod
-    def validate_api_key(api_key: str) -> Optional[str]:  # ← SIN async
+    def validate_api_key(api_key: str) -> Optional[str]:
         """Valida una API key y retorna el site_id"""
         result = supabase.table('site_stats').select('site_id').eq('api_key', api_key).execute()
         
@@ -91,7 +92,7 @@ class Database:
         return None
     
     @staticmethod
-    def save_feedback(comment_id: str, site_id: str, correct_label: str, old_label: str):  # ← SIN async
+    def save_feedback(comment_id: str, site_id: str, correct_label: str, old_label: str):
         """Guarda feedback del usuario"""
         
         feedback_data = {
@@ -111,7 +112,7 @@ class Database:
         }).eq('id', comment_id).execute()
     
     @staticmethod
-    def get_site_statistics(site_id: str) -> Dict:  # ← SIN async
+    def get_site_statistics(site_id: str) -> Dict:
         """Obtiene estadísticas del sitio"""
         result = supabase.table('site_stats').select('*').eq('site_id', site_id).execute()
         
@@ -149,7 +150,7 @@ class Database:
         return None
     
     @staticmethod
-    def get_training_data(site_id: str, limit: int = 1000) -> List[Dict]:  # ← SIN async
+    def get_training_data(site_id: str, limit: int = 1000) -> List[Dict]:
         """Obtiene datos para reentrenamiento"""
         result = supabase.table('comments_analyzed')\
             .select('features, actual_label')\
@@ -167,7 +168,7 @@ class Database:
         return f"sg_{secrets.token_urlsafe(32)}"
     
     @staticmethod
-    def check_retrain_needed(site_id: str) -> bool:  # ← SIN async
+    def check_retrain_needed(site_id: str) -> bool:
         """Verifica si es necesario reentrenar el modelo"""
         result = supabase.table('feedback_queue')\
             .select('id', count='exact')\
@@ -176,4 +177,8 @@ class Database:
             .execute()
         
         pending_count = result.count if result.count else 0
-        return pending_count >= settings.retrain_threshold
+        
+        # ⚠️ CAMBIO: Acceder correctamente a settings
+        retrain_threshold = getattr(settings, 'RETRAIN_THRESHOLD', 100)
+        
+        return pending_count >= retrain_threshold
