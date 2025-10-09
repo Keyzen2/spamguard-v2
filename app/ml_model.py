@@ -1,235 +1,247 @@
+"""
+SpamGuard ML Model v3.0 Hybrid
+Sistema híbrido: Random Forest + Naive Bayes
+"""
 import numpy as np
 import joblib
+from pathlib import Path
+from sklearn.ensemble import RandomForestClassifier
 from typing import Dict, List
 import os
-from pathlib import Path
 
-from app.config import get_settings
+from app.features import FeatureExtractor
 
-settings = get_settings()
 
 class SpamDetector:
-    """Modelo de ML para detección de spam"""
+    """
+    Detector híbrido de spam
+    Combina Random Forest (base) + Naive Bayes (entrenado)
+    """
     
     def __init__(self):
-        self.model = None
-        self.is_trained = False
+        self.feature_extractor = FeatureExtractor()
         
-        # Intentar cargar modelo pre-entrenado
-        self._load_global_model()
+        # Modelo base: Random Forest con reglas
+        self.rf_model = RandomForestClassifier(
+            n_estimators=100,
+            max_depth=10,
+            random_state=42
+        )
+        self.rf_trained = False
+        
+        # Modelo secundario: Naive Bayes desde retrain_model.py
+        self.nb_model = None
+        self.nb_available = False
+        
+        # Intentar cargar Naive Bayes
+        self._load_naive_bayes()
     
-    def _load_global_model(self):
-        """Carga el modelo desde storage persistente o local"""
-        
-        # Detectar ubicación del modelo
-        volume_path = os.getenv('RAILWAY_VOLUME_MOUNT_PATH')
-        
-        if volume_path:
-            # Buscar en volumen persistente de Railway
-            model_path = Path(volume_path) / 'models' / 'spam_model.pkl'
-            print(f"📦 Buscando modelo en volumen persistente: {model_path}")
-        else:
-            # Buscar localmente (desarrollo)
-            model_path = Path('models') / 'spam_model.pkl'
-            print(f"📁 Buscando modelo localmente: {model_path}")
-        
-        if model_path.exists():
-            try:
-                self.model = joblib.load(model_path)
-                self.is_trained = True
-                print(f"✅ Modelo cargado exitosamente desde: {model_path}")
-            except Exception as e:
-                print(f"⚠️ Error cargando modelo: {e}")
-                self.is_trained = False
-        else:
-            print(f"ℹ️ No existe modelo entrenado en: {model_path}")
-            print("📝 API funcionará con reglas básicas hasta el primer entrenamiento")
-            self.is_trained = False
-    
-    def load_model(self, model_path: str):
+    def _load_naive_bayes(self):
         """
-        Carga un modelo desde un archivo .pkl
-        
-        Args:
-            model_path: Ruta al archivo del modelo (puede ser relativa o con volumen)
+        Cargar modelo Naive Bayes entrenado (si existe)
         """
+        # Detectar ruta del volumen persistente
+        volume_path = os.getenv('RAILWAY_VOLUME_MOUNT_PATH', '/data')
+        model_path = Path(volume_path) / 'models' / 'spam_model.pkl'
+        
+        if not model_path.exists():
+            print("ℹ️ No hay modelo Naive Bayes entrenado aún")
+            print(f"   Buscado en: {model_path}")
+            return
+        
         try:
-            # Si la ruta no es absoluta, verificar si usamos volumen
-            path = Path(model_path)
-            if not path.is_absolute():
-                volume_path = os.getenv('RAILWAY_VOLUME_MOUNT_PATH')
-                if volume_path and not str(path).startswith(volume_path):
-                    # Buscar en volumen
-                    path = Path(volume_path) / model_path
+            self.nb_model = joblib.load(model_path)
+            self.nb_available = True
             
-            self.model = joblib.load(path)
-            self.is_trained = True
-            print(f"✅ Modelo recargado desde: {path}")
+            # Leer metadata
+            metadata_path = model_path.parent / 'model_metadata.json'
+            if metadata_path.exists():
+                import json
+                with open(metadata_path, 'r') as f:
+                    metadata = json.load(f)
+                
+                print("✅ Modelo Naive Bayes cargado!")
+                print(f"   📊 Accuracy: {metadata.get('metrics', {}).get('test_accuracy', 0):.4f}")
+                print(f"   🎯 Muestras: {metadata.get('training_samples', 0)}")
+                print(f"   📅 Entrenado: {metadata.get('trained_at', 'N/A')}")
+            else:
+                print("✅ Modelo Naive Bayes cargado (sin metadata)")
+        
         except Exception as e:
-            print(f"❌ Error recargando modelo desde {model_path}: {e}")
-            self.is_trained = False
+            print(f"⚠️ Error cargando Naive Bayes: {e}")
+            self.nb_model = None
+            self.nb_available = False
     
-    def predict(self, features: Dict) -> Dict:
+    async def predict(self, comment_data: Dict) -> Dict:
         """
-        Predice si un comentario es spam
+        Predicción híbrida: RF + NB
         
         Args:
-            features: Diccionario con características extraídas
-            
+            comment_data: Datos del comentario (comment_content, author, email, etc)
+        
         Returns:
-            Dict con: is_spam, confidence, score, reasons
-        """
-        
-        # Si no hay modelo entrenado, usar reglas heurísticas
-        if not self.is_trained or self.model is None:
-            return self._rule_based_prediction(features)
-        
-        try:
-            # El modelo es un pipeline de scikit-learn (TfidfVectorizer + MultinomialNB)
-            # Necesita el texto del comentario directamente
-            content = features.get('content', '')
-            
-            if not content:
-                # Fallback a reglas si no hay contenido
-                return self._rule_based_prediction(features)
-            
-            # Predicción del modelo
-            prediction = self.model.predict([content])[0]
-            probabilities = self.model.predict_proba([content])[0]
-            
-            # Probabilidad de spam (clase 1)
-            spam_probability = probabilities[1]
-            
-            # Determinar si es spam (umbral 0.5)
-            is_spam = prediction == 1
-            
-            # Generar razones
-            reasons = self._get_ml_prediction_reasons(
-                features, 
-                spam_probability, 
-                is_spam
-            )
-            
-            return {
-                'is_spam': bool(is_spam),
-                'confidence': float(spam_probability),
-                'score': float(spam_probability * 100),
-                'reasons': reasons
+            {
+                'category': 'spam' | 'ham',
+                'confidence': float (0-1),
+                'risk_level': 'low' | 'medium' | 'high',
+                'model_used': 'hybrid' | 'rf_only'
             }
-            
-        except Exception as e:
-            print(f"⚠️ Error en predicción ML: {e}")
-            # Fallback a reglas
-            return self._rule_based_prediction(features)
-    
-    def _rule_based_prediction(self, features: Dict) -> Dict:
         """
-        Sistema de reglas para cuando no hay modelo entrenado
-        """
-        score = 0
-        reasons = []
+        # 1. Extraer features para Random Forest
+        features = self.feature_extractor.extract_all(comment_data)
         
-        # URLs sospechosas
-        url_count = features.get('url_count', 0)
-        if url_count > 3:
-            score += 30
-            reasons.append(f"Contiene {url_count} enlaces")
+        # 2. Predicción con Random Forest (reglas + heurísticas)
+        rf_score = self._predict_with_rules(features)
         
-        if features.get('has_suspicious_tld', 0) == 1:
-            score += 25
-            reasons.append("Dominios sospechosos detectados")
+        # 3. Predicción con Naive Bayes (si está disponible)
+        nb_score = 0.5  # Neutral por defecto
         
-        # Palabras spam
-        spam_keywords = features.get('spam_keyword_count', 0)
-        if spam_keywords > 0:
-            score += spam_keywords * 15
-            reasons.append(f"Contiene {spam_keywords} palabras spam")
+        if self.nb_available and self.nb_model is not None:
+            nb_score = self._predict_with_nb(comment_data.get('comment_content', ''))
         
-        # Email sospechoso
-        if features.get('email_domain_suspicious', 0) == 1:
-            score += 20
-            reasons.append("Email de dominio temporal")
+        # 4. Combinar scores
+        if self.nb_available:
+            # Sistema híbrido: dar más peso a NB si está entrenado
+            final_score = (rf_score * 0.4) + (nb_score * 0.6)
+            model_used = 'hybrid'
+        else:
+            # Solo Random Forest
+            final_score = rf_score
+            model_used = 'rf_only'
         
-        # Mayúsculas excesivas
-        if features.get('uppercase_ratio', 0) > 0.5:
-            score += 15
-            reasons.append("Exceso de mayúsculas")
+        # 5. Clasificación final
+        is_spam = final_score > 0.5
+        confidence = final_score if is_spam else (1 - final_score)
         
-        # Caracteres especiales
-        if features.get('special_char_ratio', 0) > 0.3:
-            score += 10
-            reasons.append("Muchos caracteres especiales")
-        
-        # HTML en comentario
-        if features.get('has_html', 0) == 1:
-            score += 20
-            reasons.append("Contiene código HTML")
-        
-        # Comportamiento bot
-        if features.get('is_bot', 0) == 1:
-            score += 35
-            reasons.append("Detectado como bot")
-        
-        # Sin user agent
-        if features.get('has_user_agent', 0) == 0:
-            score += 15
-            reasons.append("Sin user agent")
-        
-        # Normalizar score a 0-1
-        confidence = min(score / 100, 1.0)
-        is_spam = confidence > 0.5
-        
-        if not is_spam and not reasons:
-            reasons.append("No se detectaron señales de spam")
+        # 6. Nivel de riesgo
+        if confidence >= 0.8:
+            risk_level = 'high'
+        elif confidence >= 0.6:
+            risk_level = 'medium'
+        else:
+            risk_level = 'low'
         
         return {
-            'is_spam': is_spam,
-            'confidence': confidence,
-            'score': score,
-            'reasons': reasons[:5]
+            'category': 'spam' if is_spam else 'ham',
+            'confidence': float(confidence),
+            'risk_level': risk_level,
+            'model_used': model_used,
+            'scores': {
+                'rf': float(rf_score),
+                'nb': float(nb_score) if self.nb_available else None,
+                'final': float(final_score)
+            },
+            'features_count': len(features)
         }
     
-    def _get_ml_prediction_reasons(
-        self, 
-        features: Dict, 
-        spam_prob: float,
-        is_spam: bool
-    ) -> List[str]:
+    def _predict_with_rules(self, features: Dict) -> float:
         """
-        Genera explicaciones basadas en la predicción del modelo ML
+        Predicción basada en reglas heurísticas + Random Forest
         """
-        reasons = []
+        spam_score = 0.0
         
-        if is_spam:
-            # Alta probabilidad de spam
-            reasons.append(f"Modelo ML detectó spam ({spam_prob*100:.1f}% confianza)")
-            
-            if features.get('spam_keyword_count', 0) > 0:
-                reasons.append(f"Contiene palabras spam ({features['spam_keyword_count']})")
-            
-            if features.get('url_count', 0) > 2:
-                reasons.append(f"Múltiples enlaces ({features['url_count']})")
-            
-            if features.get('has_suspicious_tld', 0) == 1:
-                reasons.append("Dominios sospechosos")
-            
-            if features.get('is_bot', 0) == 1:
-                reasons.append("Detectado como bot")
-        else:
-            # Comentario legítimo
-            reasons.append(f"Modelo ML: contenido legítimo ({(1-spam_prob)*100:.1f}% confianza)")
-            
-            if features.get('text_length', 0) > 50:
-                reasons.append("Comentario con contenido sustancial")
-            
-            if features.get('url_count', 0) == 0:
-                reasons.append("Sin enlaces sospechosos")
-            
-            if features.get('spam_keyword_count', 0) == 0:
-                reasons.append("Sin palabras spam detectadas")
+        # Regla 1: URLs sospechosas
+        if features.get('url_count', 0) > 3:
+            spam_score += 0.3
+        elif features.get('url_count', 0) > 0:
+            spam_score += 0.1
         
-        return reasons[:5]
+        # Regla 2: Palabras spam
+        spam_density = features.get('spam_keyword_density', 0)
+        if spam_density > 0.1:
+            spam_score += 0.4
+        elif spam_density > 0.05:
+            spam_score += 0.2
+        
+        # Regla 3: Caracteres especiales excesivos
+        if features.get('special_char_ratio', 0) > 0.3:
+            spam_score += 0.2
+        
+        # Regla 4: Mayúsculas excesivas
+        if features.get('uppercase_ratio', 0) > 0.5:
+            spam_score += 0.2
+        
+        # Regla 5: Email sospechoso
+        if features.get('email_domain_suspicious', False):
+            spam_score += 0.2
+        
+        # Regla 6: Contenido HTML
+        if features.get('has_html', False):
+            spam_score += 0.15
+        
+        # Regla 7: Comentario de noche (bot)
+        if features.get('is_night_time', False):
+            spam_score += 0.1
+        
+        # Regla 8: User agent es bot
+        if features.get('is_bot', False):
+            spam_score += 0.3
+        
+        # Normalizar entre 0 y 1
+        spam_score = min(1.0, spam_score)
+        
+        return spam_score
+    
+    def _predict_with_nb(self, text: str) -> float:
+        """
+        Predicción con Naive Bayes
+        
+        Args:
+            text: Texto del comentario
+        
+        Returns:
+            Probabilidad de spam (0-1)
+        """
+        if not self.nb_available or self.nb_model is None:
+            return 0.5
+        
+        try:
+            # El modelo de retrain_model.py es un pipeline TF-IDF + NB
+            proba = self.nb_model.predict_proba([text])[0]
+            return float(proba[1])  # Probabilidad de clase 'spam' (1)
+        except Exception as e:
+            print(f"⚠️ Error en predicción NB: {e}")
+            return 0.5
+    
+    def reload_model(self):
+        """
+        Recargar modelo Naive Bayes (útil después de reentrenar)
+        """
+        print("🔄 Recargando modelo Naive Bayes...")
+        self._load_naive_bayes()
+    
+    def get_model_info(self) -> Dict:
+        """
+        Información del modelo actual
+        """
+        info = {
+            'rf_available': True,
+            'nb_available': self.nb_available,
+            'model_type': 'hybrid' if self.nb_available else 'rf_only'
+        }
+        
+        if self.nb_available:
+            volume_path = os.getenv('RAILWAY_VOLUME_MOUNT_PATH', '/data')
+            metadata_path = Path(volume_path) / 'models' / 'model_metadata.json'
+            
+            if metadata_path.exists():
+                import json
+                with open(metadata_path, 'r') as f:
+                    metadata = json.load(f)
+                info['nb_metadata'] = metadata
+        
+        return info
 
 
-# Instancia global del detector
-spam_detector = SpamDetector()
+# Instancia global
+_detector = None
+
+
+def get_detector() -> SpamDetector:
+    """
+    Obtener instancia singleton del detector
+    """
+    global _detector
+    if _detector is None:
+        _detector = SpamDetector()
+    return _detector
