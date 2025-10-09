@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 import time
 import logging
 from datetime import datetime
+from app.api import routes_ml
 
 from app.config import get_settings
 from app.ml_model import spam_detector
@@ -419,9 +420,10 @@ async def version():
 
 # Router de anti-spam (prefix="/api/v1" ya incluido en routes.py)
 app.include_router(spam_router)
+app.include_router(routes_ml.router)
 
 # Router de antivirus (descomenta cuando esté listo)
-# app.include_router(antivirus_router)
+# app.include_router(antivirus_router)app.include_router
 
 # ========================================
 # EVENTOS DE APLICACIÓN
