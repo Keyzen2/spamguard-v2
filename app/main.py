@@ -11,7 +11,12 @@ import time
 import logging
 from app.config import settings
 from app.ml.model import MLPredictor
-from app.api.v1 import api_router
+
+# ========================================
+# IMPORTAR ROUTERS CORRECTAMENTE
+# ========================================
+from app.api.routes import router as spam_router  # ← Anti-spam (ya tiene /api/v1)
+from app.api.routes_antivirus import router as antivirus_router  # ← Antivirus
 
 # Logging
 logging.basicConfig(
@@ -60,31 +65,9 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     description=settings.DESCRIPTION,
     version=settings.VERSION,
-    docs_url="/docs" if settings.DEBUG else None,
-    redoc_url="/redoc" if settings.DEBUG else None,
-    lifespan=lifespan,
-    openapi_tags=[
-        {
-            "name": "Registration",
-            "description": "Register and get your free API key"
-        },
-        {
-            "name": "Analysis",
-            "description": "Spam detection endpoints"
-        },
-        {
-            "name": "Feedback",
-            "description": "Submit feedback to improve the model"
-        },
-        {
-            "name": "Statistics",
-            "description": "Get your usage statistics"
-        },
-        {
-            "name": "Account",
-            "description": "Manage your account"
-        }
-    ]
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # CORS
@@ -135,7 +118,37 @@ async def general_exception_handler(request: Request, exc: Exception):
         }
     )
 
-# Health check
+# ========================================
+# ROOT ENDPOINTS (sin prefijo)
+# ========================================
+
+@app.get("/", tags=["Root"])
+async def root():
+    """
+    🏠 API Root
+    
+    Welcome to SpamGuard API v3.0 Hybrid!
+    """
+    return {
+        "message": "Welcome to SpamGuard API v3.0 Hybrid",
+        "version": settings.VERSION,
+        "description": "Free spam detection API powered by machine learning",
+        "features": [
+            "Spam detection",
+            "Phishing detection",
+            "Malware scanning",
+            "1,000 free requests/month",
+            "No credit card required"
+        ],
+        "docs": "/docs",
+        "endpoints": {
+            "register": "/api/v1/register-site",
+            "analyze_spam": "/api/v1/analyze",
+            "scan_malware": "/api/v1/antivirus/scan/start",
+            "health": "/health"
+        }
+    }
+
 @app.get("/health", tags=["Health"])
 async def health_check():
     """
@@ -158,34 +171,18 @@ async def health_check():
         "environment": settings.ENVIRONMENT,
         "model_status": ml_status,
         "cache_status": cache_status,
-        "api_docs": "/docs" if settings.DEBUG else "https://docs.spamguard.ai"
+        "api_docs": "/docs"
     }
 
-# Root endpoint
-@app.get("/", tags=["Root"])
-async def root():
-    """
-    🏠 API Root
-    
-    Welcome to SpamGuard API v3.0 Hybrid!
-    """
-    return {
-        "message": "Welcome to SpamGuard API v3.0 Hybrid",
-        "version": settings.VERSION,
-        "description": "Free spam detection API powered by machine learning",
-        "features": [
-            "Spam detection",
-            "Phishing detection",
-            "1,000 free requests/month",
-            "No credit card required"
-        ],
-        "docs": "/docs" if settings.DEBUG else "https://docs.spamguard.ai",
-        "register": f"{settings.API_V1_STR}/register",
-        "support": "support@spamguard.ai"
-    }
+# ========================================
+# INCLUIR ROUTERS (SIN doble prefijo)
+# ========================================
 
-# Include API router
-app.include_router(api_router, prefix=settings.API_V1_STR)
+# Router de anti-spam (ya tiene prefix="/api/v1")
+app.include_router(spam_router)
+
+# Router de antivirus (ya tiene prefix="/api/v1/antivirus")
+app.include_router(antivirus_router)
 
 # Custom 404 handler
 @app.exception_handler(404)
@@ -196,9 +193,10 @@ async def not_found_handler(request: Request, exc):
             "error": "Not Found",
             "message": f"The endpoint {request.url.path} does not exist",
             "available_endpoints": {
-                "docs": "/docs" if settings.DEBUG else "https://docs.spamguard.ai",
-                "register": f"{settings.API_V1_STR}/register",
-                "analyze": f"{settings.API_V1_STR}/analyze"
+                "docs": "/docs",
+                "register": "/api/v1/register-site",
+                "analyze": "/api/v1/analyze",
+                "antivirus_scan": "/api/v1/antivirus/scan/start"
             }
         }
     )
