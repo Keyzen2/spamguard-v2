@@ -1,3 +1,6 @@
+"""
+Database utilities and operations
+"""
 from supabase import create_client, Client
 from app.config import get_settings
 from typing import Optional, Dict, List
@@ -6,12 +9,22 @@ import uuid
 
 settings = get_settings()
 
-# Cliente Supabase
-# ⚠️ CAMBIO: Usar MAYÚSCULAS (como están definidas en config.py)
+# Cliente Supabase global
 supabase: Client = create_client(
-    settings.SUPABASE_URL,      # ← ERA: settings.supabase_url
-    settings.SUPABASE_SERVICE_KEY  # ← ERA: settings.supabase_service_key
+    settings.SUPABASE_URL,
+    settings.SUPABASE_SERVICE_KEY
 )
+
+
+def get_supabase() -> Client:
+    """
+    🆕 Obtener cliente de Supabase
+    
+    Returns:
+        Cliente de Supabase configurado
+    """
+    return supabase
+
 
 class Database:
     """Clase para manejar todas las operaciones de base de datos"""
@@ -177,8 +190,6 @@ class Database:
             .execute()
         
         pending_count = result.count if result.count else 0
-        
-        # ⚠️ CAMBIO: Acceder correctamente a settings
         retrain_threshold = getattr(settings, 'RETRAIN_THRESHOLD', 100)
         
         return pending_count >= retrain_threshold
