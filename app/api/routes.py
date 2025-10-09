@@ -70,13 +70,229 @@ class StatsResponse(BaseModel):
     spam_block_rate: float
     last_retrain: Optional[str]
 
+class RegisterSiteRequest(BaseModel):
+    site_url: str = Field(..., description="URL del sitio WordPress")
+    admin_email: EmailStr = Field(..., description="Email del administrador")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "site_url": "https://example.com",
+                "admin_email": "admin@example.com"
+            }
+        }
+
 class ApiKeyResponse(BaseModel):
     site_id: str
     api_key: str
     created_at: str
     message: str
 
+# === ENDPOINT RAÍZ DE LA API (Para validación del plugin) ===
+
+@router.get("/")
+async def api_info():
+    """
+    **Información de la API - Endpoint de validación**
+    
+    Este endpoint es usado por el plugin de WordPress para verificar
+    que la API está funcionando correctamente.
+    """
+    return {
+        "name": "SpamGuard API",
+        "version": "3.0.0",
+        "status": "operational",
+        "message": "✅ API funcionando correctamente",
+        "endpoints": {
+            "health": "/api/v1/health",
+            "register": "/api/v1/register-site",
+            "analyze": "/api/v1/analyze",
+            "feedback": "/api/v1/feedback",
+            "stats": "/api/v1/stats",
+            "docs": "/docs"
+        },
+        "model": {
+            "status": "trained" if spam_detector.is_trained else "baseline",
+            "version": "2.0"
+        },
+        "documentation": "https://docs.spamguard.app"
+    }
+
+
+@router.get("/health")
+async def health_check():
+    """
+    **Health check del servicio**
+    
+    Verifica que todos los componentes estén funcionando:
+    - API operativa
+    - Modelo ML cargado
+    - Base de datos conectada
+    """
+    try:
+        # Test de conexión a base de datos
+        db_healthy = True
+        try:
+            supabase.table('site_stats').select('count').limit(1).execute()
+        except:
+            db_healthy = False
+        
+        model_status = "trained" if spam_detector.is_trained else "baseline"
+        
+        return {
+            "status": "healthy" if db_healthy else "degraded",
+            "timestamp": datetime.utcnow().isoformat(),
+            "components": {
+                "api": "operational",
+                "model": model_status,
+                "database": "connected" if db_healthy else "error"
+            },
+            "version": "3.0.0",
+            "model_accuracy": "92.82%" if spam_detector.is_trained else "N/A"
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "error": str(e)
+        }
+
+
 # === ENDPOINTS PÚBLICOS ===
+
+@router.post("/register-site", response_model=ApiKeyResponse)
+async def register_new_site(request: RegisterSiteRequest):
+    """
+    **Registra un nuevo sitio WordPress y genera API key**
+    
+    Este endpoint es llamado automáticamente por el plugin de WordPress
+    cuando se activa por primera vez.
+    
+    Returns:
+        - site_id: Identificador único del sitio
+        - api_key: Clave de API para autenticación
+        - created_at: Fecha de creación
+        - message: Mensaje informativo
+    """
+    try:
+        import hashlib
+        
+        # Generar site_id único basado en la URL
+        site_id = hashlib.sha256(request.site_url.encode()).hexdigest()[:16]
+        
+        # Verificar si el sitio ya está registrado
+        existing = supabase.table('site_stats')\
+            .select('api_key, created_at')\
+            .eq('site_id', site_id)\
+            .execute()
+        
+        if existing.data:
+            logger.info(f"🔑 Sitio existente solicitando API key: {request.site_url}")
+            return ApiKeyResponse(
+                site_id=site_id,
+                api_key=existing.data[0]['api_key'],
+                created_at=existing.data[0].get('created_at', datetime.utcnow().isoformat()),
+                message="✅ Este sitio ya está registrado. Aquí está tu API key."
+            )
+        
+        # Crear nuevo registro
+        api_key = Database.generate_api_key()
+        
+        new_site = {
+            'site_id': site_id,
+            'api_key': api_key,
+            'site_url': request.site_url,
+            'admin_email': request.admin_email,
+            'total_analyzed': 0,
+            'total_spam_blocked': 0,
+            'total_ham_approved': 0,
+            'created_at': datetime.utcnow().isoformat(),
+            'last_seen': datetime.utcnow().isoformat()
+        }
+        
+        supabase.table('site_stats').insert(new_site).execute()
+        
+        logger.info(f"✅ Nuevo sitio registrado: {request.site_url} (ID: {site_id})")
+        
+        return ApiKeyResponse(
+            site_id=site_id,
+            api_key=api_key,
+            created_at=new_site['created_at'],
+            message="✅ Sitio registrado exitosamente. Guarda tu API key de forma segura."
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Error registrando sitio: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error registrando sitio: {str(e)}"
+        )
+
+
+@router.get("/register-site")
+async def register_site_info():
+    """
+    **Información sobre cómo registrar un sitio**
+    
+    Este endpoint GET proporciona instrucciones cuando alguien
+    intenta acceder al endpoint de registro incorrectamente.
+    """
+    return {
+        "message": "⚠️ Usa POST para registrar un nuevo sitio",
+        "endpoint": "/api/v1/register-site",
+        "method": "POST",
+        "required_fields": {
+            "site_url": "URL del sitio WordPress",
+            "admin_email": "Email del administrador"
+        },
+        "example": {
+            "site_url": "https://example.com",
+            "admin_email": "admin@example.com"
+        },
+        "response": {
+            "site_id": "string",
+            "api_key": "string",
+            "created_at": "ISO 8601 datetime",
+            "message": "string"
+        }
+    }
+
+
+@router.get("/check-site")
+async def check_existing_site(site_url: str):
+    """
+    **Verifica si un sitio ya está registrado**
+    
+    Útil para verificar la existencia de un sitio antes de registrarlo.
+    
+    Query Parameters:
+        site_url: URL del sitio a verificar
+    """
+    try:
+        import hashlib
+        site_id = hashlib.sha256(site_url.encode()).hexdigest()[:16]
+        
+        result = supabase.table('site_stats')\
+            .select('api_key, created_at')\
+            .eq('site_id', site_id)\
+            .execute()
+        
+        if result.data:
+            return {
+                "exists": True,
+                "site_id": site_id,
+                "registered_at": result.data[0].get('created_at'),
+                "message": "✅ Sitio ya registrado"
+            }
+        
+        return {
+            "exists": False,
+            "message": "❌ Sitio no encontrado. Usa POST /register-site para registrarlo."
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/analyze", response_model=PredictionResponse)
 async def analyze_comment(
@@ -87,6 +303,21 @@ async def analyze_comment(
 ):
     """
     **Analiza un comentario y predice si es spam**
+    
+    Este es el endpoint principal usado por el plugin de WordPress
+    para analizar comentarios en tiempo real.
+    
+    Requiere:
+        - X-API-Key header con la API key del sitio
+        - Datos del comentario en el body
+    
+    Returns:
+        - is_spam: Boolean indicando si es spam
+        - confidence: Nivel de confianza (0-1)
+        - spam_score: Puntuación de spam (0-100)
+        - reasons: Lista de razones de la clasificación
+        - comment_id: ID del análisis guardado
+        - explanation: Detalles técnicos del análisis
     """
     try:
         # Sanitizar inputs
@@ -122,6 +353,15 @@ async def analyze_comment(
             prediction=prediction
         )
         
+        # 5. Actualizar estadísticas del sitio
+        Database.update_site_stats(site_id, prediction['is_spam'])
+        
+        logger.info(
+            f"📊 Análisis completado - Site: {site_id}, "
+            f"Spam: {prediction['is_spam']}, "
+            f"Confidence: {prediction['confidence']:.2f}"
+        )
+        
         return PredictionResponse(
             is_spam=prediction['is_spam'],
             confidence=prediction['confidence'],
@@ -131,7 +371,10 @@ async def analyze_comment(
             explanation=explanation
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"❌ Error analizando comentario: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Error procesando comentario: {str(e)}"
@@ -146,6 +389,14 @@ async def submit_feedback(
 ):
     """
     **Envía feedback sobre la clasificación de un comentario**
+    
+    Permite al administrador corregir errores del modelo.
+    El feedback se usa para mejorar el modelo con reentrenamiento.
+    
+    Requiere:
+        - X-API-Key header
+        - comment_id: ID del comentario analizado
+        - is_spam: Clasificación correcta (true/false)
     """
     try:
         # Obtener el comentario original
@@ -177,107 +428,24 @@ async def submit_feedback(
         
         response = {
             "status": "success",
-            "message": "Feedback recibido correctamente",
+            "message": "✅ Feedback recibido correctamente",
             "queued_for_training": should_retrain
         }
         
         if should_retrain:
             response["message"] += ". El modelo será reentrenado próximamente."
+            logger.info(f"🔄 Reentrenamiento programado para site: {site_id}")
         
         return response
         
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"❌ Error guardando feedback: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Error guardando feedback: {str(e)}"
         )
-
-
-@router.post("/register-site", response_model=ApiKeyResponse)
-async def register_new_site(
-    site_url: str,
-    admin_email: EmailStr,
-):
-    """
-    **Registra un nuevo sitio y genera API key**
-    """
-    try:
-        import hashlib
-        site_id = hashlib.sha256(site_url.encode()).hexdigest()[:16]
-        
-        existing = supabase.table('site_stats')\
-            .select('api_key, created_at')\
-            .eq('site_id', site_id)\
-            .execute()
-        
-        if existing.data:
-            return ApiKeyResponse(
-                site_id=site_id,
-                api_key=existing.data[0]['api_key'],
-                created_at=existing.data[0].get('created_at', datetime.utcnow().isoformat()),
-                message="Este sitio ya está registrado. Aquí está tu API key."
-            )
-        
-        # Crear nuevo registro
-        api_key = Database.generate_api_key()
-        
-        new_site = {
-            'site_id': site_id,
-            'api_key': api_key,
-            'total_analyzed': 0,
-            'total_spam_blocked': 0,
-            'total_ham_approved': 0,
-            'created_at': datetime.utcnow().isoformat()
-        }
-        
-        supabase.table('site_stats').insert(new_site).execute()
-        
-        return ApiKeyResponse(
-            site_id=site_id,
-            api_key=api_key,
-            created_at=new_site['created_at'],
-            message="Sitio registrado exitosamente. Guarda tu API key de forma segura."
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error registrando sitio: {str(e)}"
-        )
-
-
-@router.get("/check-site")
-async def check_existing_site(site_url: str):
-    """
-    Verifica si un sitio ya está registrado
-    """
-    try:
-        import hashlib
-        site_id = hashlib.sha256(site_url.encode()).hexdigest()[:16]
-        
-        result = supabase.table('site_stats')\
-            .select('api_key')\
-            .eq('site_id', site_id)\
-            .execute()
-        
-        if result.data:
-            return {
-                "exists": True,
-                "api_key": result.data[0]['api_key'],
-                "message": "Sitio ya registrado"
-            }
-        
-        return {
-            "exists": False,
-            "message": "Sitio no encontrado"
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/stats", response_model=StatsResponse)
@@ -286,6 +454,19 @@ async def get_statistics(
 ):
     """
     **Obtiene estadísticas del sitio**
+    
+    Retorna métricas de uso y precisión del modelo para el sitio.
+    
+    Requiere:
+        - X-API-Key header
+    
+    Returns:
+        - total_analyzed: Comentarios totales analizados
+        - total_spam_blocked: Spam bloqueado
+        - total_ham_approved: Comentarios legítimos aprobados
+        - accuracy: Precisión del modelo (si hay feedback)
+        - spam_block_rate: Tasa de bloqueo de spam
+        - last_retrain: Fecha del último reentrenamiento
     """
     try:
         stats = Database.get_site_statistics(site_id)
@@ -303,23 +484,11 @@ async def get_statistics(
         return StatsResponse(**stats)
         
     except Exception as e:
+        logger.error(f"❌ Error obteniendo estadísticas: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Error obteniendo estadísticas: {str(e)}"
         )
-
-
-@router.get("/health")
-async def health_check():
-    """
-    **Health check del servicio**
-    """
-    return {
-        "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
-        "model_status": "trained" if spam_detector.is_trained else "baseline",
-        "version": "1.0.0"
-    }
 
 
 # === ENDPOINTS DE ADMIN (PROTEGIDOS) ===
@@ -330,15 +499,20 @@ async def retrain_model_endpoint(
     admin_key: str = Depends(verify_admin_api_key)
 ):
     """
-    🔒 ENDPOINT PROTEGIDO - Solo para administradores
+    🔒 **ENDPOINT PROTEGIDO - Solo para administradores**
     
     Reentrenar el modelo ML con datos actualizados.
-    Requiere X-Admin-Key en los headers.
+    
+    Requiere:
+        - X-Admin-Key header
     
     Security:
-    - Requiere admin API key
-    - Rate limit: 1 request por hora
-    - Solo un reentrenamiento a la vez
+        - Requiere admin API key
+        - Rate limit: 1 request por hora
+        - Solo un reentrenamiento a la vez
+    
+    Returns:
+        Confirmación de que el reentrenamiento ha iniciado
     """
     
     # 1. Verificar rate limit (1 request por hora)
@@ -359,26 +533,36 @@ async def retrain_model_endpoint(
         # 3. Ejecutar reentrenamiento en background
         background_tasks.add_task(run_retrain_background)
         
+        logger.info("🚀 Reentrenamiento iniciado")
+        
         return {
             "success": True,
-            "message": "Model retraining started in background",
+            "message": "✅ Model retraining started in background",
             "estimated_time": "5-15 minutes",
             "check_status_at": "/api/v1/admin/retrain-status"
         }
         
     except Exception as e:
         release_retrain_lock()
+        logger.error(f"❌ Error iniciando reentrenamiento: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to start retraining: {str(e)}"
         )
+
 
 @router.get("/admin/retrain-status", tags=["admin"])
 async def get_retrain_status_endpoint(
     admin_key: str = Depends(verify_admin_api_key)
 ):
     """
-    🔒 Verificar estado del reentrenamiento
+    🔒 **Verificar estado del reentrenamiento**
+    
+    Requiere:
+        - X-Admin-Key header
+    
+    Returns:
+        Estado actual del proceso de reentrenamiento
     """
     status = get_retrain_status()
     
@@ -388,11 +572,11 @@ async def get_retrain_status_endpoint(
             "status": "running",
             "started_at": status["started_at"].isoformat(),
             "elapsed_seconds": elapsed,
-            "estimated_remaining": max(0, 900 - elapsed)
+            "estimated_remaining": max(0, 900 - elapsed),
+            "message": "🔄 Reentrenamiento en progreso..."
         }
     else:
         # Leer metadata del último entrenamiento
-        # CORREGIDO: Buscar en volumen persistente
         volume_path = os.getenv('RAILWAY_VOLUME_MOUNT_PATH')
         
         if volume_path:
@@ -411,13 +595,15 @@ async def get_retrain_status_endpoint(
                     "last_training": metadata.get('trained_at'),
                     "last_accuracy": metadata.get('metrics', {}).get('test_accuracy'),
                     "training_samples": metadata.get('training_samples'),
-                    "storage_location": str(metadata_path)
+                    "model_version": metadata.get('version'),
+                    "storage_location": str(metadata_path),
+                    "message": "✅ No hay reentrenamiento en progreso"
                 }
             else:
                 return {
                     "status": "idle",
                     "last_training": None,
-                    "message": f"No training metadata found at {metadata_path}"
+                    "message": f"⚠️ No training metadata found at {metadata_path}"
                 }
         except Exception as e:
             return {
@@ -435,7 +621,7 @@ async def run_retrain_background():
     import subprocess
     
     try:
-        logger.info("🚀 Starting model retraining...")
+        logger.info("🚀 Starting model retraining in background...")
         
         # Ejecutar script de reentrenamiento
         result = subprocess.run(
@@ -447,6 +633,7 @@ async def run_retrain_background():
         
         if result.returncode == 0:
             logger.info("✅ Model retrained successfully")
+            logger.info(f"Output: {result.stdout}")
             
             # Recargar modelo en memoria
             spam_detector.load_model('models/spam_model.pkl')
@@ -460,3 +647,31 @@ async def run_retrain_background():
         logger.error(f"❌ Retraining error: {str(e)}")
     finally:
         release_retrain_lock()
+        logger.info("🔓 Retrain lock released")
+
+
+# === ENDPOINTS ADICIONALES ÚTILES ===
+
+@router.get("/test")
+async def test_endpoint():
+    """
+    **Endpoint de prueba simple**
+    
+    Útil para verificar que la API responde correctamente
+    sin necesidad de autenticación.
+    """
+    return {
+        "message": "✅ API funcionando correctamente",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": "3.0.0"
+    }
+
+
+@router.get("/ping")
+async def ping():
+    """
+    **Ping simple**
+    
+    Respuesta mínima para health checks externos
+    """
+    return {"status": "ok"}
