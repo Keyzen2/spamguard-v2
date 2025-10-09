@@ -1,3 +1,4 @@
 """
-Módulos de SpamGuard Security Suite
+Modules Package
+Contains specialized modules for security features
 """
