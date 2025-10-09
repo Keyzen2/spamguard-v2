@@ -4,18 +4,13 @@ Rutas de Machine Learning - Reentrenamiento
 from fastapi import APIRouter, HTTPException, Header, Depends
 from typing import Optional
 import os
-import sys
-from pathlib import Path
-
-# Añadir path para imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from app.retrain_model import ModelRetrainer
 
 router = APIRouter(prefix="/api/v1/ml", tags=["Machine Learning"])
 
 # Secret key para autorización
-ML_SECRET_KEY = os.getenv("ML_SECRET_KEY", "your-secret-key-here")
+ML_SECRET_KEY = os.getenv("ML_SECRET_KEY", "change-me-in-production")
 
 
 async def verify_ml_secret(x_ml_secret: str = Header(None)):
