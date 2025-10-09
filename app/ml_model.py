@@ -283,3 +283,6 @@ def get_detector() -> SpamDetector:
     if _detector is None:
         _detector = SpamDetector()
     return _detector
+
+# Compatibilidad con código antiguo
+spam_detector = get_detector()
