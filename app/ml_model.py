@@ -1,6 +1,6 @@
 """
 SpamGuard ML Model v3.0 Hybrid
-Sistema híbrido: Random Forest + Naive Bayes
+Sistema hibrido: Random Forest + Naive Bayes
 """
 import numpy as np
 import joblib
@@ -14,7 +14,7 @@ from app.features import FeatureExtractor
 
 class SpamDetector:
     """
-    Detector híbrido de spam
+    Detector hibrido de spam
     Combina Random Forest (base) + Naive Bayes (entrenado)
     """
     
@@ -45,8 +45,8 @@ class SpamDetector:
         model_path = Path(volume_path) / 'models' / 'spam_model.pkl'
         
         if not model_path.exists():
-            print("ℹ️ No hay modelo Naive Bayes entrenado aún")
-            print(f"   Buscado en: {model_path}")
+            print("INFO: No hay modelo Naive Bayes entrenado aun")
+            print(f"Buscado en: {model_path}")
             return
         
         try:
@@ -60,42 +60,29 @@ class SpamDetector:
                 with open(metadata_path, 'r') as f:
                     metadata = json.load(f)
                 
-                print("✅ Modelo Naive Bayes cargado!")
-                print(f"   📊 Accuracy: {metadata.get('metrics', {}).get('test_accuracy', 0):.4f}")
-                print(f"   🎯 Muestras: {metadata.get('training_samples', 0)}")
-                print(f"   📅 Entrenado: {metadata.get('trained_at', 'N/A')}")
+                print("SUCCESS: Modelo Naive Bayes cargado!")
+                print(f"Accuracy: {metadata.get('metrics', {}).get('test_accuracy', 0):.4f}")
+                print(f"Muestras: {metadata.get('training_samples', 0)}")
+                print(f"Entrenado: {metadata.get('trained_at', 'N/A')}")
             else:
-                print("✅ Modelo Naive Bayes cargado (sin metadata)")
+                print("SUCCESS: Modelo Naive Bayes cargado (sin metadata)")
         
         except Exception as e:
-            print(f"⚠️ Error cargando Naive Bayes: {e}")
+            print(f"WARNING: Error cargando Naive Bayes: {e}")
             self.nb_model = None
             self.nb_available = False
     
     def predict(self, comment_data: Dict) -> Dict:
         """
-        Predicción híbrida: RF + NB
-
-        Args:
-            comment_data: Datos del comentario (content, author, author_email, etc)
-
-        Returns:
-            {
-                'is_spam': bool,
-                'confidence': float (0-1),
-                'score': float (0-100),
-                'reasons': List[str],
-                'risk_level': 'low' | 'medium' | 'high',
-                'model_used': 'hybrid' | 'rf_only'
-            }
+        Prediccion hibrida: RF + NB
         """
         # 1. Extraer features para Random Forest
         features = self.feature_extractor.extract(comment_data)
         
-        # 2. Predicción con Random Forest (reglas + heurísticas)
+        # 2. Prediccion con Random Forest (reglas + heuristicas)
         rf_score = self._predict_with_rules(features)
         
-        # 3. Predicción con Naive Bayes (si está disponible)
+        # 3. Prediccion con Naive Bayes (si esta disponible)
         nb_score = 0.5  # Neutral por defecto
 
         if self.nb_available and self.nb_model is not None:
@@ -103,7 +90,7 @@ class SpamDetector:
         
         # 4. Combinar scores
         if self.nb_available:
-            # Sistema híbrido: dar más peso a NB si está entrenado
+            # Sistema hibrido: dar mas peso a NB si esta entrenado
             final_score = (rf_score * 0.4) + (nb_score * 0.6)
             model_used = 'hybrid'
         else:
@@ -111,7 +98,7 @@ class SpamDetector:
             final_score = rf_score
             model_used = 'rf_only'
         
-        # 5. Clasificación final
+        # 5. Clasificacion final
         is_spam = final_score > 0.5
         confidence = final_score if is_spam else (1 - final_score)
         spam_score = final_score * 100  # Score 0-100
@@ -143,9 +130,7 @@ class SpamDetector:
         }
     
     def _predict_with_rules(self, features: Dict) -> float:
-        """
-        Predicción basada en reglas heurísticas + Random Forest
-        """
+        """Prediccion basada en reglas heuristicas + Random Forest"""
         spam_score = 0.0
         
         # Regla 1: URLs sospechosas
@@ -165,7 +150,7 @@ class SpamDetector:
         if features.get('special_char_ratio', 0) > 0.3:
             spam_score += 0.2
         
-        # Regla 4: Mayúsculas excesivas
+        # Regla 4: Mayusculas excesivas
         if features.get('uppercase_ratio', 0) > 0.5:
             spam_score += 0.2
         
@@ -191,15 +176,7 @@ class SpamDetector:
         return spam_score
     
     def _predict_with_nb(self, text: str) -> float:
-        """
-        Predicción con Naive Bayes
-
-        Args:
-            text: Texto del comentario
-
-        Returns:
-            Probabilidad de spam (0-1)
-        """
+        """Prediccion con Naive Bayes"""
         if not self.nb_available or self.nb_model is None:
             return 0.5
 
@@ -208,26 +185,17 @@ class SpamDetector:
             proba = self.nb_model.predict_proba([text])[0]
             return float(proba[1])  # Probabilidad de clase 'spam' (1)
         except Exception as e:
-            print(f"⚠️ Error en predicción NB: {e}")
+            print(f"WARNING: Error en prediccion NB: {e}")
             return 0.5
 
     def _generate_reasons(self, features: Dict, is_spam: bool) -> List[str]:
-        """
-        Genera lista de razones para la clasificación
-
-        Args:
-            features: Características extraídas
-            is_spam: Si fue clasificado como spam
-
-        Returns:
-            Lista de razones
-        """
+        """Genera lista de razones para la clasificacion"""
         reasons = []
 
         if is_spam:
             # Razones por las que ES spam
             if features.get('spam_keyword_count', 0) > 0:
-                reasons.append(f"Contiene {features['spam_keyword_count']} palabras típicas de spam")
+                reasons.append(f"Contiene {features['spam_keyword_count']} palabras tipicas de spam")
 
             if features.get('url_count', 0) > 3:
                 reasons.append(f"Exceso de enlaces ({features['url_count']})")
@@ -244,10 +212,10 @@ class SpamDetector:
                 reasons.append("User-agent identificado como bot")
 
             if features.get('uppercase_ratio', 0) > 0.5:
-                reasons.append(f"Exceso de mayúsculas ({round(features['uppercase_ratio']*100)}%)")
+                reasons.append(f"Exceso de mayusculas ({round(features['uppercase_ratio']*100)}%)")
 
             if features.get('has_html', 0):
-                reasons.append("Contiene código HTML")
+                reasons.append("Contiene codigo HTML")
 
             if features.get('special_char_ratio', 0) > 0.3:
                 reasons.append("Exceso de caracteres especiales")
@@ -256,11 +224,11 @@ class SpamDetector:
                 reasons.append("Publicado en horario nocturno (actividad de bot)")
 
             if not reasons:
-                reasons.append("Patrón general sospechoso detectado por el modelo ML")
+                reasons.append("Patron general sospechoso detectado por el modelo ML")
         else:
             # Razones por las que NO es spam
             if features.get('spam_keyword_count', 0) == 0:
-                reasons.append("No contiene palabras típicas de spam")
+                reasons.append("No contiene palabras tipicas de spam")
 
             if features.get('url_count', 0) == 0:
                 reasons.append("No contiene enlaces promocionales")
@@ -269,27 +237,23 @@ class SpamDetector:
                 reasons.append("Comentario sustancial y detallado")
 
             if not features.get('is_bot', 0):
-                reasons.append("User-agent legítimo")
+                reasons.append("User-agent legitimo")
 
             if not features.get('email_domain_suspicious', 0):
                 reasons.append("Email de dominio confiable")
 
             if not reasons:
-                reasons.append("Patrón general legítimo detectado")
+                reasons.append("Patron general legitimo detectado")
 
         return reasons
     
     def reload_model(self):
-        """
-        Recargar modelo Naive Bayes (útil después de reentrenar)
-        """
-        print("🔄 Recargando modelo Naive Bayes...")
+        """Recargar modelo Naive Bayes (util despues de reentrenar)"""
+        print("Recargando modelo Naive Bayes...")
         self._load_naive_bayes()
     
     def get_model_info(self) -> Dict:
-        """
-        Información del modelo actual
-        """
+        """Informacion del modelo actual"""
         info = {
             'rf_available': True,
             'nb_available': self.nb_available,
@@ -314,9 +278,7 @@ _detector = None
 
 
 def get_detector() -> SpamDetector:
-    """
-    Obtener instancia singleton del detector
-    """
+    """Obtener instancia singleton del detector"""
     global _detector
     if _detector is None:
         _detector = SpamDetector()
