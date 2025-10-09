@@ -1,7 +1,3 @@
-"""
-SpamGuard API v3.0 - Main Application
-Unified spam detection and malware scanning API
-"""
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
