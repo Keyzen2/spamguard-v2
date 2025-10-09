@@ -1,9 +1,8 @@
-# Multi-stage build for production
-FROM python:3.11-slim as builder
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# System dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
@@ -13,24 +12,17 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Stage 2: Runtime
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Copy installed packages from builder
-COPY --from=builder /root/.local /root/.local
-
-# ✅ Copy ALL application code (including docs/)
+# Copy application
 COPY . .
 
-# Make sure scripts are usable
-ENV PATH=/root/.local/bin:$PATH
+# Test imports during build
+RUN python -c "from app.main import app; print('SUCCESS: app.main imports OK')" || \
+    (echo "ERROR: Import failed!" && exit 1)
 
-# Expose port
+# Expose port (Railway usa $PORT dinámico)
 EXPOSE 8000
 
-# Default command (Railway overrides this)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start command - Railway sobreescribe esto con railway.json
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
