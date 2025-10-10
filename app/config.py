@@ -1,7 +1,10 @@
+"""
+Configuration settings for SpamGuard API
+"""
 from pydantic_settings import BaseSettings
 from typing import List, Optional
-import json
 import os
+
 
 class Settings(BaseSettings):
     # Project
@@ -10,7 +13,7 @@ class Settings(BaseSettings):
     DESCRIPTION: str = "Free spam detection API powered by machine learning"
     ENVIRONMENT: str = "production"
     DEBUG: bool = False
-    LOG_LEVEL: str = "INFO"  # ← AGREGAR ESTA LÍNEA
+    LOG_LEVEL: str = "INFO"
     
     # API
     API_V1_STR: str = "/api/v1"
@@ -23,11 +26,11 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: str
     
     # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+    DATABASE_URL: str = ""
     
     # Security
     SECRET_KEY: str
-    ADMIN_API_KEY: str = ""
+    ADMIN_API_KEY: str = ""  # ← MAYÚSCULAS con default vacío
     
     # CORS
     CORS_ORIGINS: List[str] = ["*"]
@@ -40,9 +43,11 @@ class Settings(BaseSettings):
     
     class Config:
         env_file = ".env"
-        case_sensitive = False
+        case_sensitive = False  # ← CAMBIAR A False para mayor compatibilidad
+
 
 def get_settings() -> Settings:
     return Settings()
+
 
 settings = get_settings()
