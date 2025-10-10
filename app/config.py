@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     
     # Security
     SECRET_KEY: str
+    admin_api_key: str = ""
     
     # CORS
     CORS_ORIGINS: List[str] = ["*"]
