@@ -38,13 +38,10 @@ def verify_api_key(x_api_key: str = Header(...)) -> str:
 
 def verify_admin_api_key(x_admin_key: str = Header(..., alias="X-Admin-Key")) -> str:
     """
-    Verificar API key de ADMINISTRADOR (para endpoints sensibles como reentrenamiento)
-    
-    Esta key debe ser diferente a las API keys normales y solo tú debes conocerla.
-    Se configura en variables de entorno de Railway.
+    Verificar API key de ADMINISTRADOR
     """
     settings = get_settings()
-    expected_admin_key = settings.admin_api_key
+    expected_admin_key = settings.ADMIN_API_KEY  # ← MAYÚSCULAS
     
     if not expected_admin_key:
         raise HTTPException(
@@ -52,7 +49,7 @@ def verify_admin_api_key(x_admin_key: str = Header(..., alias="X-Admin-Key")) ->
             detail="Admin functionality not configured. Set ADMIN_API_KEY in environment."
         )
     
-    # Comparación segura (previene timing attacks)
+    # Comparación segura
     if not compare_digest_safe(x_admin_key, expected_admin_key):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -60,7 +57,6 @@ def verify_admin_api_key(x_admin_key: str = Header(..., alias="X-Admin-Key")) ->
         )
     
     return x_admin_key
-
 
 def compare_digest_safe(a: str, b: str) -> bool:
     """
