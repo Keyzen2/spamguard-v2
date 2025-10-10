@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     
     # Security
     SECRET_KEY: str
-    admin_api_key: str = ""
+    ADMIN_API_KEY: str = ""
     
     # CORS
     CORS_ORIGINS: List[str] = ["*"]
@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     
     class Config:
         env_file = ".env"
-        case_sensitive = True
+        case_sensitive = False
 
 def get_settings() -> Settings:
     return Settings()
