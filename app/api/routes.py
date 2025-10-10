@@ -98,6 +98,13 @@ async def api_info():
     Este endpoint es usado por el plugin de WordPress para verificar
     que la API está funcionando correctamente.
     """
+    from app.ml_model import get_detector
+    
+    detector = get_detector()
+    
+    # Obtener información del modelo de forma segura
+    model_info = detector.get_model_info()
+    
     return {
         "name": "SpamGuard API",
         "version": "3.0.0",
@@ -112,8 +119,9 @@ async def api_info():
             "docs": "/docs"
         },
         "model": {
-            "status": "trained" if spam_detector.is_trained else "baseline",
-            "version": "2.0"
+            "status": "trained" if model_info.get('nb_available') else "baseline",
+            "type": model_info.get('model_type', 'rf_only'),
+            "version": "3.0-hybrid"
         },
         "documentation": "https://docs.spamguard.app"
     }
