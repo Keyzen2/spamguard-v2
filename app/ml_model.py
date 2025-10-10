@@ -33,6 +33,9 @@ class SpamDetector:
         self.nb_model = None
         self.nb_available = False
         
+        # ✅ AGREGAR ESTA PROPIEDAD
+        self.is_trained = False  # <--- NUEVA LÍNEA
+        
         # Intentar cargar Naive Bayes
         self._load_naive_bayes()
     
@@ -47,11 +50,13 @@ class SpamDetector:
         if not model_path.exists():
             print("INFO: No hay modelo Naive Bayes entrenado aun")
             print(f"Buscado en: {model_path}")
+            self.is_trained = False  # ✅ ACTUALIZAR AQUÍ
             return
         
         try:
             self.nb_model = joblib.load(model_path)
             self.nb_available = True
+            self.is_trained = True  # ✅ MARCAR COMO ENTRENADO
             
             # Leer metadata
             metadata_path = model_path.parent / 'model_metadata.json'
@@ -71,6 +76,7 @@ class SpamDetector:
             print(f"WARNING: Error cargando Naive Bayes: {e}")
             self.nb_model = None
             self.nb_available = False
+            self.is_trained = False
     
     def predict(self, comment_data: Dict) -> Dict:
         """
